@@ -1,0 +1,39 @@
+/* mobile: cards. phones only, desktop must stay unchanged.
+   phones get a plain run of postcards: no sticky stack, the film itself is the art
+   and plays while its card is the one in view (main.js picks one at a time).
+   keep this query in sync with phoneMQ in main.js */
+@media (max-width: 760px), (max-height: 500px) and (orientation: landscape) and (pointer: coarse) {
+  .deck { gap: 28px; }
+  .card {
+    position: relative; top: auto;
+    height: auto; min-height: 0;
+    transform: none;
+  }
+  .card::after { display: none; }
+
+  .card-art { cursor: default; background: #19203a; }
+  .card-art video { object-fit: cover; }
+  /* the print, the mark and the tap hint are the desktop lens idea; the film stands alone here */
+  .card-art .art-shader,
+  .card-art .card-mark,
+  .card-art .card-hint { display: none; }
+}
+
+/* portrait phones: square film on top, word and line underneath */
+@media (max-width: 760px) {
+  .card { grid-template-columns: 1fr; grid-template-rows: auto auto; }
+  .card-art { margin: 12px 12px 0; aspect-ratio: 1 / 1; border-radius: 3px; }
+  .card-body { padding: 22px 22px 26px; }
+  .card-word { font-size: min(44px, calc(100cqi / 8.4)); }
+  .card-line { margin-top: 10px; font-size: 16px; line-height: 1.5; }
+}
+
+/* landscape phones: film on the left, words on the right, sized to the short screen */
+@media (max-height: 500px) and (orientation: landscape) and (pointer: coarse) {
+  .deck { gap: 24px; }
+  .card { grid-template-columns: auto 1fr; grid-template-rows: auto; align-items: center; }
+  .card-art { margin: 12px; height: min(calc(100svh - 120px), 300px); aspect-ratio: 1 / 1; }
+  .card-body { padding: 18px 32px 18px 12px; }
+  .card-word { font-size: min(48px, calc(100cqi / 8.4)); }
+  .card-line { margin-top: 12px; font-size: 16px; }
+}

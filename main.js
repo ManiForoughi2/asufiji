@@ -1,5 +1,5 @@
-import { mountShader, prefersReducedMotion } from "./shaders.js?v=e8be4c9f";
-import { startSea } from "./sea.js?v=e8be4c9f";
+import { mountShader, prefersReducedMotion } from "./shaders.js?v=94d9ab72";
+import { startSea } from "./sea.js?v=94d9ab72";
 
 const root = document.documentElement;
 const reduced = prefersReducedMotion();
@@ -120,6 +120,8 @@ if (!reduced) {
 
 // ---------- value cards: the cursor opens a lens onto the video ----------
 const finePtr = matchMedia("(hover: hover) and (pointer: fine)").matches;
+// phones skip the lens and the deck: keep in sync with css/m-cards.css
+const phoneMQ = matchMedia("(max-width: 760px), (max-height: 500px) and (orientation: landscape) and (pointer: coarse)");
 let liveVid = null;
 document.querySelectorAll(".card-art").forEach((art) => {
   const video = art.querySelector("video");
@@ -127,13 +129,13 @@ document.querySelectorAll(".card-art").forEach((art) => {
   const play = () => { if (!reduced) { liveVid = video; video.play().catch(() => {}); } };
   const stop = () => { video.pause(); if (liveVid === video) liveVid = null; };
   if (finePtr) {
-    art.addEventListener("pointerenter", () => { art.classList.add("lens"); play(); });
+    art.addEventListener("pointerenter", () => { if (phoneMQ.matches) return; art.classList.add("lens"); play(); });
     art.addEventListener("pointermove", (e) => {
       const r = print.getBoundingClientRect();
       print.style.setProperty("--mx", (e.clientX - r.left).toFixed(1) + "px");
       print.style.setProperty("--my", (e.clientY - r.top).toFixed(1) + "px");
     });
-    art.addEventListener("pointerleave", () => { art.classList.remove("lens"); stop(); });
+    art.addEventListener("pointerleave", () => { if (phoneMQ.matches) return; art.classList.remove("lens"); stop(); });
   } else {
     // touch: the top card of the deck opens on its own (see frame); a tap toggles it by hand
     const hint = document.createElement("span");
@@ -142,6 +144,7 @@ document.querySelectorAll(".card-art").forEach((art) => {
     hint.innerHTML = '<svg viewBox="0 0 9 10"><path fill="currentColor" d="M0 0l9 5-9 5z"/></svg>Tap to watch';
     art.append(hint);
     art.addEventListener("click", () => {
+      if (phoneMQ.matches) return;
       const open = art.classList.toggle("open");
       art.dataset.shut = open ? "" : "1";
       if (open) play(); else stop();
@@ -160,6 +163,44 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") liveVid?.play().catch(() => {});
 });
 
+// phones: the film is the art. the card nearest mid-screen plays, every other one sits paused
+const deck = document.querySelector(".deck");
+const deckVids = [...document.querySelectorAll(".card-art video")];
+let deckNear = false, pickQueued = false;
+const pickFilm = () => {
+  pickQueued = false;
+  if (!phoneMQ.matches) return;
+  let best = null;
+  if (deckNear && !reduced) {
+    const vh = window.innerHeight;
+    let bestD = Infinity, curD = Infinity;
+    for (const v of deckVids) {
+      const r = v.getBoundingClientRect();
+      if (!r.height || (Math.min(r.bottom, vh) - Math.max(r.top, 0)) / r.height < 0.6) continue;
+      const d = Math.abs(r.top + r.height / 2 - vh / 2);
+      if (v === liveVid) curD = d;
+      if (d < bestD) { bestD = d; best = v; }
+    }
+    // keep the playing film until another is clearly closer to the middle, so two in view don't flip
+    if (curD !== Infinity && curD - bestD < 48) best = liveVid;
+  }
+  for (const v of deckVids) if (v !== best && !v.paused) v.pause();
+  if (best) { liveVid = best; if (best.paused) best.play().catch(() => {}); }
+  else if (deckVids.includes(liveVid)) liveVid = null;
+};
+const queuePick = () => { if (!pickQueued) { pickQueued = true; requestAnimationFrame(pickFilm); } };
+if (deck && "IntersectionObserver" in window) {
+  new IntersectionObserver(([e]) => { deckNear = e.isIntersecting; queuePick(); }, { rootMargin: "25% 0px" }).observe(deck);
+  window.addEventListener("scroll", () => { if (deckNear && phoneMQ.matches) queuePick(); }, { passive: true });
+  window.addEventListener("resize", queuePick, { passive: true });
+  phoneMQ.addEventListener("change", () => {
+    document.querySelectorAll(".card-art").forEach((a) => { a.classList.remove("lens", "open"); a.dataset.shut = ""; });
+    deckVids.forEach((v) => v.pause());
+    liveVid = null;
+    queuePick();
+  });
+}
+
 // ---------- sign-in shells: accounts aren't live yet, so say so on submit ----------
 document.querySelectorAll("form.login").forEach((form) => {
   form.addEventListener("submit", (e) => {
@@ -171,18 +212,63 @@ document.querySelectorAll("form.login").forEach((form) => {
 // ---------- film postcards: play while on screen ----------
 const films = [...document.querySelectorAll(".frame video")];
 const frames = [...document.querySelectorAll(".frame")];
+const filmRow = document.querySelector(".frames");
+const filmSection = document.querySelector(".film");
+// phones get a swipe row (m-home.css); keep in step with its breakpoint
+const filmSwipe = matchMedia("(max-width: 760px)");
 if (films.length && !reduced && "IntersectionObserver" in window) {
+  // desktop: each postcard plays while it's on screen
+  // phone: the whole row plays while the section is near, so a swipe never lands on a paused card
   const onScreen = new Set();
+  let near = false;
+  const syncFilms = () => {
+    const live = document.visibilityState === "visible";
+    films.forEach((v) => {
+      const want = live && (filmSwipe.matches ? near : onScreen.has(v));
+      if (want && v.paused) v.play().catch(() => {});
+      else if (!want && !v.paused) v.pause();
+    });
+  };
   const fio = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (e.isIntersecting) { onScreen.add(e.target); e.target.play().catch(() => {}); }
-      else { onScreen.delete(e.target); e.target.pause(); }
-    }
+    for (const e of entries) e.isIntersecting ? onScreen.add(e.target) : onScreen.delete(e.target);
+    syncFilms();
   }, { threshold: 0.2 });
   films.forEach((v) => fio.observe(v));
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") onScreen.forEach((v) => v.play().catch(() => {}));
-  });
+  if (filmSection) {
+    new IntersectionObserver(([e]) => { near = e.isIntersecting; syncFilms(); }, { rootMargin: "20% 0px" }).observe(filmSection);
+  }
+  filmSwipe.addEventListener("change", syncFilms);
+  document.addEventListener("visibilitychange", syncFilms);
+}
+
+// phone row: --k is 1 for the centred postcard and falls to 0 one card away
+if (filmRow && frames.length) {
+  let fq = false;
+  const centre = () => {
+    fq = false;
+    if (!filmSwipe.matches) { frames.forEach((f) => { f.style.removeProperty("--k"); f.classList.remove("on"); }); return; }
+    const mid = filmRow.scrollLeft + filmRow.clientWidth / 2;
+    const step = frames[1] ? frames[1].offsetLeft - frames[0].offsetLeft : frames[0].offsetWidth;
+    frames.forEach((f) => {
+      const c = f.offsetLeft - filmRow.offsetLeft + f.offsetWidth / 2;
+      const k = clamp(1 - Math.abs(c - mid) / step, 0, 1);
+      f.style.setProperty("--k", k.toFixed(3));
+      f.classList.toggle("on", k > 0.5);
+    });
+  };
+  const queueCentre = () => { if (!fq) { fq = true; requestAnimationFrame(centre); } };
+  const snapTo = (f, smooth) => {
+    const left = f.offsetLeft - filmRow.offsetLeft + f.offsetWidth / 2 - filmRow.clientWidth / 2;
+    filmRow.scrollTo({ left, behavior: smooth && !reduced ? "smooth" : "instant" });
+  };
+  // open on the middle card so both neighbours peek in
+  const openMiddle = () => { if (filmSwipe.matches && frames[1]) snapTo(frames[1], false); queueCentre(); };
+  openMiddle();
+  filmSwipe.addEventListener("change", openMiddle);
+  filmRow.addEventListener("scroll", queueCentre, { passive: true });
+  addEventListener("resize", queueCentre, { passive: true });
+  // a tap on a peeking card brings it to the middle
+  frames.forEach((f) => f.addEventListener("click", () => { if (filmSwipe.matches && !f.classList.contains("on")) snapTo(f, true); }));
 }
 
 // ---------- one rAF scroll loop: hero drift, deck stacking, art parallax, nav state ----------
@@ -196,46 +282,92 @@ const navLinks = [...document.querySelectorAll(".rail-link")];
 // phone menu
 const rail = document.querySelector(".rail");
 const menuBtn = document.querySelector(".rail-menu");
-menuBtn?.addEventListener("click", () => {
-  const open = rail.classList.toggle("open");
+const phoneNav = matchMedia("(max-width: 760px), (max-height: 500px) and (pointer: coarse)");
+let menuOpen = false;
+function setMenu(open) {
+  if (!rail || !menuBtn || open === menuOpen) return;
+  menuOpen = open;
+  const hadFocus = rail.contains(document.activeElement);
+  rail.classList.toggle("open", open);
+  root.classList.toggle("menu-open", open);
   menuBtn.setAttribute("aria-expanded", String(open));
   menuBtn.textContent = open ? "Close" : "Menu";
-});
-const closeMenu = () => { if (rail?.classList.contains("open")) menuBtn.click(); };
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
-// close on a link tap (same-page anchors don't navigate) and on any tap outside the rail
-rail?.querySelector(".rail-links")?.addEventListener("click", (e) => { if (e.target.closest("a")) closeMenu(); });
-document.addEventListener("pointerdown", (e) => { if (!e.target.closest(".rail")) closeMenu(); }, { passive: true });
+  // everything but the rail goes inert, which also keeps tab focus inside the menu
+  for (const el of document.body.children) if (el !== rail) el.inert = open;
+  if (open) rail.querySelector(".rail-link")?.focus({ preventScroll: true });
+  else if (hadFocus) menuBtn.focus({ preventScroll: true });
+}
+const closeMenu = () => setMenu(false);
+menuBtn?.addEventListener("click", () => setMenu(!menuOpen));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && menuOpen) { e.preventDefault(); closeMenu(); } });
+// close on any link tap in the rail (same-page anchors don't navigate)
+rail?.addEventListener("click", (e) => { if (e.target.closest("a")) closeMenu(); });
+phoneNav.addEventListener?.("change", closeMenu);
+addEventListener("pageshow", closeMenu);
+// the bar takes a fill once the page moves under it
+const railScrolled = () => rail?.classList.toggle("is-scrolled", window.scrollY > 8);
+addEventListener("scroll", railScrolled, { passive: true });
+railScrolled();
+// day / night inside the menu drives the same switch as the desktop toggle
+const themePicks = [...document.querySelectorAll("[data-theme-pick]")];
+const syncPicks = () => themePicks.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themePick === theme())));
+themePicks.forEach((b) => b.addEventListener("click", () => {
+  if (b.dataset.themePick !== theme()) document.querySelector(".theme-toggle")?.click();
+}));
+new MutationObserver(syncPicks).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+syncPicks();
 
 let queued = false;
+// style writes go through here: skipped when the value hasn't moved, so a still part of the page
+// isn't restyled on every scroll frame
+const setVar = (el, k, v) => {
+  const c = el._sv || (el._sv = {});
+  if (c[k] !== v) { c[k] = v; el.style.setProperty(k, v); }
+};
+const cardBox = [], cardH = [], artTop = [], frameBox = [];
 function frame() {
   queued = false;
   const vh = window.innerHeight;
   const y = window.scrollY;
   let top = -1;
 
-  if (hero && !reduced) hero.style.setProperty("--hp", clamp(y / (vh * 0.9), 0, 1).toFixed(4));
+  // the hero is gone after one screen; stop touching it
+  if (hero && !reduced && y < vh * 1.5) setVar(hero, "--hp", clamp(y / (vh * 0.9), 0, 1).toFixed(4));
 
-  for (let i = 0; i < cards.length; i++) {
-    const card = cards[i];
-    const r = card.getBoundingClientRect();
-    if (r.bottom < -vh || r.top > vh * 2) continue;
-    const next = cards[i + 1];
-    let p = 0;
-    if (next) {
-      const nr = next.getBoundingClientRect();
-      p = clamp(1 - (nr.top - r.top) / card.offsetHeight, 0, 1);
+  const phone = phoneMQ.matches;
+  if (!phone) {
+    // every read first, then every write: interleaving them forced a style + layout pass per card
+    for (let i = 0; i < cards.length; i++) {
+      cardBox[i] = cards[i].getBoundingClientRect();
+      cardH[i] = cards[i].offsetHeight;
+      artTop[i] = cardArts[i] ? cardArts[i].getBoundingClientRect().top : Infinity;
     }
-    card.style.setProperty("--p", p.toFixed(4));
-    if (p < 0.5 && r.top < vh * 0.55 && r.bottom > vh * 0.55) top = i;
-    if (!reduced && arts[i]) {
-      const off = (r.top + r.height / 2 - vh / 2) / vh;
-      arts[i].style.setProperty("--py", (off * -36).toFixed(2) + "px");
+    for (let i = 0; i < cards.length; i++) {
+      const r = cardBox[i];
+      if (r.bottom < -vh || r.top > vh * 2) continue;
+      const nr = cardBox[i + 1];
+      const p = nr ? clamp(1 - (nr.top - r.top) / cardH[i], 0, 1) : 0;
+      setVar(cards[i], "--p", p.toFixed(4));
+      if (p < 0.5 && r.top < vh * 0.55 && r.bottom > vh * 0.55) top = i;
+      if (!reduced && arts[i]) {
+        const off = (r.top + r.height / 2 - vh / 2) / vh;
+        setVar(arts[i], "--py", (off * -36).toFixed(2) + "px");
+      }
+      // a print buried under the next card can't be seen: hold its shader until it's uncovered
+      const m = arts[i]?.paperShaderMount;
+      if (m && !reduced) {
+        const buried = !!nr && nr.top <= artTop[i] + 1;
+        if (buried && m.speed !== 0) { m._held = m.speed; m.setSpeed(0); }
+        else if (!buried && m._held != null) {
+          if (r.bottom > -120 && r.top < vh + 120) m.setSpeed(m._held);
+          m._held = null;
+        }
+      }
     }
   }
 
   // touch: only the card on top of the deck shows its film; the rest pause
-  if (!finePtr) {
+  if (!finePtr && !phone) {
     for (let i = 0; i < cards.length; i++) {
       const art = cardArts[i];
       if (!art) continue;
@@ -244,18 +376,20 @@ function frame() {
     }
   }
 
-  if (!reduced) {
+  // the phone swipe row has its own motion (--k); vertical drift there is wasted work
+  if (!reduced && !filmSwipe.matches) {
+    for (let i = 0; i < frames.length; i++) frameBox[i] = frames[i].getBoundingClientRect();
     frames.forEach((f, i) => {
-      const r = f.getBoundingClientRect();
+      const r = frameBox[i];
       if (r.bottom < 0 || r.top > vh) return;
       const off = (r.top + r.height / 2 - vh / 2) / vh;
-      f.style.setProperty("--py", (off * (i === 1 ? -60 : -24)).toFixed(2) + "px");
+      setVar(f, "--py", (off * (i === 1 ? -60 : -24)).toFixed(2) + "px");
     });
   }
 
   if (compass && !reduced) {
     const r = compass.getBoundingClientRect();
-    if (r.bottom > 0 && r.top < vh) compass.style.setProperty("--rot", ((r.top + r.height / 2 - vh / 2) * -0.08).toFixed(2) + "deg");
+    if (r.bottom > 0 && r.top < vh) setVar(compass, "--rot", ((r.top + r.height / 2 - vh / 2) * -0.08).toFixed(2) + "deg");
   }
 
 }

@@ -1,0 +1,42 @@
+/* mobile: perf. phones only, desktop must stay unchanged.
+   nothing here changes layout; it trades gpu-heavy paint effects for cheap ones and pins
+   things that move on scroll to their own compositor layers. */
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  /* reveals: blur on dozens of text spans means a fresh offscreen blur pass per element per frame
+     for ~1s, right while the finger is scrolling. keep the rise and the fade, drop the blur */
+  .motion .reveal,
+  .motion .kinetic .w {
+    filter: none;
+    transition-property: opacity, transform;
+  }
+
+  /* nav bar: backdrop blur re-samples everything that scrolls (and the live sea) under a
+     full-width fixed bar every frame. the fill is already 88% opaque, so go solid instead */
+  html .rail::before,
+  html .rail {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  html .rail::before { background: var(--bg); }
+
+  /* the webgl sea covers the whole hero once it's running; the css sky (and its overlay-blended
+     grain) under it is never seen but still composited */
+  .hero.gl-sea .sky { visibility: hidden; }
+  /* no-webgl fallback: the animated displacement ripple is the costliest filter on the page */
+  .word-refl { filter: none; }
+
+  /* hero text fades with scroll (--hp): give it its own layer so the fade doesn't repaint */
+  .crest-top, .hero-base { will-change: opacity; }
+
+  /* rush week: the compass turns with scroll, and it sits over the deckled paper whose
+     turbulence + displacement filter is expensive to raster. separate layers, each painted once */
+  .week-compass { will-change: transform; }
+  .itinerary::before { will-change: transform; }
+}
+
+/* tablets in portrait keep the sticky deck: the scale and the dimming change every scroll frame */
+@media (min-width: 761px) and (hover: none) and (pointer: coarse) {
+  .card { will-change: transform; }
+  .card::after { will-change: opacity; }
+}

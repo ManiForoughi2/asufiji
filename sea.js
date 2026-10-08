@@ -29,8 +29,9 @@ ${WAVES.map((w, i) => `  if (f4 >= ${f(w.L)}) return g;
 }`;
 
 // one source, two programs: sky pixels never pay for (or hold registers for) the sea path
-const FRAG = (part) => `
+const FRAG = (part, oct = 4) => `
 #define ${part}
+#define OCT ${oct}
 precision highp float;
 uniform vec2 uRes;        // canvas size, device px
 uniform float uHz;        // horizon, device px from the top (= the word's baseline)
@@ -63,7 +64,7 @@ float vn(vec2 p) {
 }
 float fbm(vec2 p) {
   float v = 0.0, a = 0.5;
-  for (int i = 0; i < 4; i++) { v += a * vn(p); p = p * 2.03 + vec2(17.1, 9.2); a *= 0.5; }
+  for (int i = 0; i < OCT; i++) { v += a * vn(p); p = p * 2.03 + vec2(17.1, 9.2); a *= 0.5; }
   return v;
 }
 #endif
@@ -188,8 +189,13 @@ const LEVELS = [{ q: 1, ms: 1000 / 60 }, { q: 1, ms: 1000 / 30 }, { q: 0.85, ms:
 
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 
+// phones and tablets: weaker gpus that also have to composite a touch scroll. same scene, fewer
+// pixels, 30fps, 3 cloud octaves, and no rendering mid-scroll or once the hero is mostly gone
+const TOUCH = matchMedia("(hover: none) and (pointer: coarse)");
+
 export function startSea(canvas, opts) {
   const { getTheme, reduced, word: wordEl } = opts;
+  const touch = TOUCH.matches;
   const attrs = { antialias: false, alpha: false, premultipliedAlpha: false, depth: false, stencil: false, preserveDrawingBuffer: false };
   const gl = canvas.getContext("webgl", attrs);
   if (!gl) return null;
@@ -202,6 +208,7 @@ export function startSea(canvas, opts) {
   let progs, sky, sea, tex;
   let dpr = 1, raf = 0, visible = true, lost = false, last = 0;
   let level = 0, W = 1, H = 1, hz = 0, acc = 0, n = 0, bad = 0;
+  let scrollT = -1e9, cw = 0, ch = 0;
 
   function init() {
     const sh = (type, src) => {
@@ -213,7 +220,7 @@ export function startSea(canvas, opts) {
     const mk = (part) => {
       const p = gl.createProgram();
       gl.attachShader(p, vs);
-      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FRAG(part)));
+      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FRAG(part, touch ? 3 : 4)));
       gl.bindAttribLocation(p, 0, "p");
       gl.linkProgram(p);
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
@@ -286,7 +293,8 @@ export function startSea(canvas, opts) {
 
   function size() {
     const q = LEVELS[level].q;
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5) * q;
+    dpr = Math.min(window.devicePixelRatio || 1, touch ? 1.25 : 1.5) * q;
+    cw = canvas.clientWidth; ch = canvas.clientHeight;
     W = Math.max(1, Math.round(canvas.clientWidth * dpr)); H = Math.max(1, Math.round(canvas.clientHeight * dpr));
     if (canvas.width !== W) canvas.width = W;
     if (canvas.height !== H) canvas.height = H;
@@ -342,6 +350,8 @@ export function startSea(canvas, opts) {
     raf = requestAnimationFrame(loop);
     const iv = LEVELS[level].ms, el = now - last;
     if (el < iv * 0.75) return;
+    // touch: hold the last frame while the finger scrolls; the gpu goes to the compositor
+    if (touch && now - scrollT < 180) { last = 0; return; }
     // watch real pacing: two windows of 30 frames well over budget means the gpu can't keep up
     if (last && el < 250) {
       acc += el;
@@ -361,11 +371,28 @@ export function startSea(canvas, opts) {
 
   try { init(); } catch (e) { console.warn("sea shader:", e); return null; }
   setLook(); size();
-  if (!reduced) { pick(probe()); if (LEVELS[level].q !== 1) size(); }
+  if (!reduced) {
+    pick(probe());
+    if (touch) level = Math.max(level, 1);                   // waves are slow, 30fps reads the same
+    if (LEVELS[level].q !== 1) size();
+  }
   draw(3.0);
   (document.fonts?.ready || Promise.resolve()).then(() => { size(); draw(3.0); });
-  new ResizeObserver(() => { if (!lost) { size(); draw(performance.now() / 1000 * 0.55); } }).observe(canvas);
-  if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => { visible = e.isIntersecting; run(visible); }).observe(canvas);
+  const resized = () => { if (!lost) { size(); draw(performance.now() / 1000 * 0.55); } };
+  let rt = 0;
+  new ResizeObserver(() => {
+    if (!touch) return resized();
+    // the url bar showing/hiding nudges the height; a stretched frame beats a texture rebuild mid-scroll
+    if (canvas.clientWidth === cw && Math.abs(canvas.clientHeight - ch) < 160) return;
+    clearTimeout(rt); rt = setTimeout(resized, 150);
+  }).observe(canvas);
+  if (touch) addEventListener("scroll", () => { scrollT = performance.now(); }, { passive: true });
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(([e]) => {
+      visible = touch ? e.intersectionRatio >= 0.35 : e.isIntersecting;
+      run(visible);
+    }, { threshold: touch ? [0, 0.35] : 0 }).observe(canvas);
+  }
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); lost = true; run(false); });
   canvas.addEventListener("webglcontextrestored", () => {
     try { init(); } catch (e) { console.warn("sea shader:", e); return; }

@@ -1,0 +1,54 @@
+/* mobile: home. phones only, desktop must stay unchanged. */
+
+@media (max-width: 760px) {
+  /* ---------- ticker ---------- */
+  .ticker { padding: 22px 0; }
+  .ticker-track { will-change: transform; backface-visibility: hidden; }
+  .ticker-row li { font-size: 14px; letter-spacing: .22em; }
+  .ticker-row li::after { width: 16px; height: 16px; margin: 0 22px 0 calc(22px - .22em); }
+
+  /* ---------- film: swipe row, centred card plays big, neighbours peek ---------- */
+  .film { padding: 10vh 0 6vh; }
+  .film .section-title { padding-inline: var(--g); }
+  .frames {
+    --fw: min(70vw, 300px, calc((62svh - 40px) * 9 / 16 + 20px));
+    gap: 14px; margin: 0;
+    padding: 20px calc((100vw - var(--fw)) / 2) 34px;
+    scroll-padding-inline: calc((100vw - var(--fw)) / 2);
+    overscroll-behavior-x: contain;
+  }
+  .frame {
+    flex: 0 0 var(--fw); padding: 10px 10px 30px;
+    scroll-snap-align: center; scroll-snap-stop: always;
+    /* the page-scroll parallax is a desktop idea; here the card follows the swipe */
+    transform: rotate(calc(var(--t, 0deg) * .75)) scale(calc(.88 + .12 * var(--k, 1)));
+    opacity: calc(.62 + .38 * var(--k, 1));
+    -webkit-tap-highlight-color: transparent;
+  }
+  .frame:not(.on) { cursor: pointer; }
+
+  /* ---------- closing card ---------- */
+  .rush { padding: 2vh var(--g) 12vh; }
+  .rush-card { --rp: 22px; padding: 48px 22px 30px; gap: 30px; border-radius: 14px; }
+  /* too long for one line at a readable size, so it splits evenly in two */
+  .rush-line { font-size: calc(100cqi / 10.6); line-height: 1.06; }
+  .rush-act { align-self: stretch; justify-self: stretch; align-items: stretch; gap: 6px; }
+  .rush-act .btn-brass { display: flex; align-items: center; justify-content: center; min-height: 56px; }
+  .rush-dm {
+    display: inline-flex; align-items: center; justify-content: center; align-self: center;
+    min-height: 48px; padding: 0 14px; font-size: 15px;
+    text-decoration: underline; text-decoration-color: rgba(236, 220, 194, .3); text-underline-offset: 5px;
+  }
+}
+
+@media (max-width: 380px) {
+  .rush-card { padding-inline: 18px; }
+}
+
+/* landscape phones: three postcards side by side, sized to the short viewport */
+@media (max-height: 500px) and (orientation: landscape) and (min-width: 761px) {
+  .film { padding-block: 14vh 8vh; }
+  .frames { max-width: calc(3 * ((78svh - 46px) * 9 / 16 + 24px) + 2 * 40px); gap: 40px; }
+  .frame:nth-child(2) { margin-top: 6svh; }
+  .rush-card { min-height: 0; padding-block: 44px; }
+}

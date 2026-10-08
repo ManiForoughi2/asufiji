@@ -1,0 +1,63 @@
+/* mobile: global. phones only, desktop must stay unchanged.
+   type scale on phones (body stays 17px):
+     display  FIJI / page word  fills the measure, set by --kw
+     title    section titles    one line, fills the measure (~26-30px)
+     label    crest, tagline    13px engraved caps, .16-.3em tracking
+     small    footer line       13px
+   rhythm: gutter --g 20-28px, sections breathe on 8svh steps. */
+
+@media (max-width: 760px) {
+  :root { --g: max(clamp(20px, 5.6vw, 28px), env(safe-area-inset-left), env(safe-area-inset-right)); }
+
+  /* ---------- home hero: crest centered, FIJI standing a touch above center ---------- */
+  .hero:not(.hero-sub) {
+    --hz: 54%;
+    --kw: min(calc((100vw - 2 * var(--g)) / 1.78), 31svh);
+    height: 100svh; min-height: 520px;
+  }
+  .crest-top {
+    bottom: calc(100% - var(--hz) + var(--kw) * .75 + clamp(16px, 2.4svh, 24px));
+    font-size: 13px; letter-spacing: .3em; gap: .8em;
+  }
+  .crest-top span:first-child { margin-right: -.3em; }
+  .hero-base { bottom: calc(env(safe-area-inset-bottom) + max(32px, 9svh)); }
+
+  /* labels: one line where the words allow, balanced pair of lines where not */
+  .tagline {
+    font-size: clamp(11px, calc((100vw - 2 * var(--g)) / 27), 14px);
+    line-height: 1.6; letter-spacing: .16em; text-indent: .16em;
+    max-width: 30em; text-wrap: balance;
+  }
+
+  /* ---------- subpage headers: short words capped so JOIN and INTERNSHIPS read as one family ---------- */
+  .hero-sub {
+    --hz: 58%;
+    --kw: min(calc((100vw - 2 * var(--g)) * .9 / var(--ratio)), 32vw, 26svh);
+    height: 64svh; min-height: 440px;
+  }
+  .hero-sub .hero-base { bottom: calc(env(safe-area-inset-bottom) + max(24px, 5svh)); }
+
+  /* ---------- section titles: one line across the measure ---------- */
+  .section-title { margin-bottom: clamp(36px, 6svh, 56px); }
+
+  /* ---------- footer: quiet line, then the wordmark on the floor ---------- */
+  .foot { padding-bottom: env(safe-area-inset-bottom); }
+  .foot-line {
+    flex-direction: column; gap: 8px;
+    padding: 40px 0 clamp(18px, 3svh, 28px);
+    font-size: 13px; line-height: 1.55; text-wrap: balance;
+  }
+  .foot-line > span { max-width: 30em; }
+}
+
+/* landscape phones: the short screen sets every size */
+@media (max-height: 500px) and (orientation: landscape) {
+  html { scroll-padding-top: 70px; }
+  .hero:not(.hero-sub) { --hz: 63%; --kw: min(46vw, 37svh); height: 100svh; min-height: 340px; }
+  .crest-top { bottom: calc(100% - var(--hz) + var(--kw) * .75 + 10px); }
+  .hero-sub { --hz: 62%; --kw: min(calc((100vw - 2 * var(--g)) * .7 / var(--ratio)), 30svh); height: 100svh; min-height: 340px; }
+  .hero-base, .hero-sub .hero-base { bottom: calc(env(safe-area-inset-bottom) + 6svh); }
+  .tagline { font-size: 12px; letter-spacing: .24em; text-indent: .24em; text-wrap: balance; }
+  .section-title { margin-bottom: 5vh; }
+  .foot { padding-bottom: env(safe-area-inset-bottom); }
+}
