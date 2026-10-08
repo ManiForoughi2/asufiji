@@ -1,5 +1,5 @@
-import { mountShader, prefersReducedMotion } from "./shaders.js?v=94d9ab72";
-import { startSea } from "./sea.js?v=94d9ab72";
+import { mountShader, prefersReducedMotion } from "./shaders.js?v=a6c659c4";
+import { startSea } from "./sea.js?v=a6c659c4";
 
 const root = document.documentElement;
 const reduced = prefersReducedMotion();
@@ -68,7 +68,10 @@ function applyTheme(t) {
   retint();
   sea?.redraw();
 }
+// phones always follow the phone's own setting; the saved pick is desktop-only
+const phoneTheme = matchMedia("(max-width: 760px), (hover: none) and (pointer: coarse)");
 function savedTheme() {
+  if (phoneTheme.matches) return null;
   try { const t = localStorage.getItem("asufiji-theme"); return t === "light" || t === "dark" ? t : null; } catch { return null; }
 }
 // the device setting wins until someone picks a theme with the switch

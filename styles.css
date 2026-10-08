@@ -158,6 +158,13 @@ svg { display: block; }
   color: var(--word); white-space: nowrap;
   transition: color .6s var(--ease);
 }
+/* the sunset behind the crest warms the base of the letters, as light off the water would */
+:root { --word-warm: #f4d3b6; }
+:root[data-theme="light"] { --word-warm: #3a2c48; }
+.word:not(.word-refl) {
+  background: linear-gradient(to bottom, var(--word) 0%, var(--word) 62%, color-mix(in srgb, var(--word-warm) 60%, var(--word)) 86%, var(--word-warm) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
 .word-refl {
   top: calc(var(--hz) - .13em);
   transform: scaleY(-1);
@@ -170,7 +177,7 @@ svg { display: block; }
 .hero.gl-sea .word-refl { display: none; }
 .hero.gl-sea .crest { transform: none; }
 .hero.gl-sea .sea { top: 0; height: 100%; }
-[data-theme="light"] .tagline { text-shadow: 0 1px 2px rgba(244, 236, 222, .9), 0 0 14px rgba(244, 236, 222, .95), 0 0 30px rgba(244, 236, 222, .8); }
+[data-theme="light"] .tagline { font-weight: 600; text-shadow: 0 0 2px rgba(250, 242, 228, 1), 0 0 10px rgba(250, 242, 228, 1), 0 0 24px rgba(250, 242, 228, .95), 0 0 44px rgba(250, 242, 228, .8); }
 .hero-base {
   position: absolute; left: var(--g); right: var(--g); bottom: calc(env(safe-area-inset-bottom) + 5svh);
   display: grid; justify-items: center;

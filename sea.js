@@ -44,17 +44,30 @@ uniform vec2 uWordRes;
 uniform float uPh[12];    // per-wave phase at uTime, wrapped on the cpu
 uniform vec3 uSkyTop, uSkyMid, uHaze, uGlow, uBody, uDeep, uGlint, uWordCol;
 uniform vec3 uIsle, uIsleFar, uCloud;   // island silhouettes and cloud tint
+uniform vec3 uSkyLow, uSkyHz, uSun, uCloudLit;  // sunset band colors, sun, sunlit cloud edge
+uniform float uSunE;                    // sun elevation (sin), just above or below the horizon
 uniform float uClouds;                  // cloud amount
 // scene texture (premultiplied): r = wordmark, g = near island, b = far island
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
+// the sun sits low, straight behind the crest
+vec3 sunDir() { return normalize(vec3(0.0, uSunE, 1.0)); }
+
+// a sunset sky: hot band at the horizon, warm low sky, then mid and top; the sun's halo
+// is strongest straight behind the word and spreads sideways along the horizon
 vec3 sky(vec3 d) {
   float e = max(d.y, 0.0);
-  vec3 c = mix(uHaze, uSkyMid, smoothstep(0.0, 0.07, e));
-  c = mix(c, uSkyTop, smoothstep(0.07, 0.5, e));
-  float g = exp(-e * 24.0) * exp(-d.x * d.x * 7.0);       // low light behind the crest
-  return c + uGlow * g * 0.6;
+  float side = d.x * d.x;
+  vec3 hz = mix(uSkyHz, uSkyLow, smoothstep(0.05, 0.9, side));          // the band cools away from the sun
+  vec3 c = mix(hz, uSkyLow, smoothstep(0.0, 0.06, e));
+  c = mix(c, uSkyMid, smoothstep(0.05, 0.26, e));
+  c = mix(c, uSkyTop, smoothstep(0.24, 0.75, e));
+  float cs = max(dot(d, sunDir()), 0.0);
+  float cs2 = cs * cs, cs4 = cs2 * cs2, cs8 = cs4 * cs4;
+  c += uSun * (cs8 * cs8 * cs8 * 0.32 + cs4 * 0.08) * (1.0 - 0.6 * smoothstep(0.0, 0.3, e));
+  c += uSun * smoothstep(0.99985, 0.99993, cs) * 1.4;                   // the disk, when it is up
+  return c;
 }
 #ifdef SKY
 float vn(vec2 p) {
@@ -90,12 +103,21 @@ void main() {
     float core = smoothstep(0.5, 0.0, length(fract(sp) - 0.5));
     col += vec3(0.92, 0.9, 0.85) * core * tw * fade * uStars * (h - 0.9965) * 220.0;
   }
-  // a thin cloud layer seen in perspective, thickest a little above the horizon
+  // a cloud deck seen in perspective, lit from below by the low sun: the side of each
+  // cloud facing the horizon catches the light, the rest falls into the dusk color
   float e = d.y;
-  vec2 cp = vec2(d.x, 1.0) / max(e, 0.02);
-  float cl = fbm(vec2(cp.x * 0.42 + uTime * 0.012, cp.y * 1.3));
-  float cm = smoothstep(0.5, 0.82, cl) * smoothstep(0.025, 0.13, e) * (1.0 - smoothstep(0.32, 0.8, e));
-  col = mix(col, uCloud + uGlow * 0.3 * exp(-e * 9.0) * exp(-d.x * d.x * 4.0), cm * uClouds);
+  vec2 cp = vec2(d.x, 1.0) / max(e, 0.018);
+  vec2 q = vec2(cp.x * 0.34 + uTime * 0.01, cp.y * 1.15);
+  float cl = fbm(q);
+  float cm = smoothstep(0.47, 0.8, cl) * smoothstep(0.018, 0.1, e) * (1.0 - smoothstep(0.38, 0.9, e));
+  if (cm > 0.001) {
+    float lit = clamp((cl - fbm(q + vec2(0.0, 0.35))) * 3.2 + 0.45, 0.0, 1.0);   // thinner toward the sun = lit edge
+    float cs = max(dot(d, sunDir()), 0.0);
+    float glow = cs * cs; glow *= glow; glow *= glow;
+    vec3 cc = mix(uCloud, uCloudLit, lit * (0.55 + 0.45 * smoothstep(0.35, 0.0, e)));
+    cc += uSun * glow * (0.35 + 0.65 * lit) * 0.7;                          // silver lining near the sun
+    col = mix(col, cc, cm * uClouds);
+  }
   // islands on the horizon, the far one already half lost in the haze
   vec4 sc = texture2D(uWord, vec2(px.x / uWordRes.x, px.y / uWordRes.y));
   col = mix(col, uIsleFar, sc.b);
@@ -126,9 +148,9 @@ void main() {
   vec3 body = mix(uBody, uDeep, depth01) * (0.85 + 0.15 * n.z);
   col = mix(body, refl, fres);
 
-  vec3 L = vec3(0.0, 0.0349786, 0.999388);                   // normalize(0, 0.035, 1)
-  float s = pow(max(dot(r, L), 0.0), 1400.0);
-  col += uGlint * s * 1.2 * (1.0 - smoothstep(0.0, 1.0, fp * 0.08));
+  vec3 L = normalize(vec3(0.0, max(uSunE, 0.012), 1.0));     // the sun, or its afterglow once set
+  float s = pow(max(dot(r, L), 0.0), 900.0);
+  col += uGlint * s * 1.6 * (1.0 - smoothstep(0.0, 1.0, fp * 0.08));
 
   col = mix(uHaze, col, exp(-t * 0.0045));                 // sea fades into the mist
 #endif
@@ -136,28 +158,32 @@ void main() {
   // one band of mist straddles the horizon so sky and sea meet without a seam
   float mist = exp(-abs(dy) / (uRes.y * 0.035));
   float mx = (px.x / uRes.x - 0.5) * 2.4;
-  col = mix(col, uHaze + uGlow * 0.18 * exp(-mx * mx), mist * 0.55);
+  col = mix(col, mix(uHaze, uSkyHz, exp(-mx * mx)) + uGlow * 0.12 * exp(-mx * mx), mist * 0.5);
 
   float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
   col += (dn - 0.5) / 255.0;
   gl_FragColor = vec4(col, 1.0);
 }`;
 
+// night = the last of a sunset (sun just under the horizon); day = a late sunrise (sun low, up)
 const LOOK = {
   dark: {
-    skyTop: "#070b17", skyMid: "#101a31", haze: "#1f2c48", glow: "#4a3f3a",
-    body: "#132038", deep: "#080e1b", glint: "#f4e6cc", word: "#ecdcc2", stars: 1,
-    isle: "#05080f", isleFar: "#141d33", cloud: "#18223b", clouds: 0.55,
+    skyTop: "#080b1c", skyMid: "#211d45", skyLow: "#6b3a58", skyHz: "#e2865a", haze: "#5a3a52", glow: "#c46a4e",
+    sun: "#ffb27a", sunE: -0.006,
+    body: "#121732", deep: "#070a18", glint: "#ffcf9e", word: "#f0c9a6", stars: 1,
+    isle: "#0b0c1c", isleFar: "#3b2a47", cloud: "#2a2242", cloudLit: "#e9906a", clouds: 0.85,
   },
   light: {
-    skyTop: "#5f8fbf", skyMid: "#9fbfdc", haze: "#eadfcb", glow: "#fff0d2",
-    body: "#3a6a95", deep: "#244d78", glint: "#ffffff", word: "#19203a", stars: 0,
-    isle: "#4e6680", isleFar: "#9aaec2", cloud: "#fbf7ef", clouds: 0.8,
+    skyTop: "#4f86bd", skyMid: "#9cc0de", skyLow: "#f2d2b6", skyHz: "#ffdca6", haze: "#f3dcc0", glow: "#ffe2b0",
+    sun: "#fff1d0", sunE: 0.03,
+    body: "#3a6a95", deep: "#22496f", glint: "#fff6e2", word: "#19203a", stars: 0,
+    isle: "#4d5f7a", isleFar: "#b6a9a8", cloud: "#c9d3df", cloudLit: "#fff1dc", clouds: 0.9,
   },
 };
-const LOOK_U = [["uSkyTop", "skyTop"], ["uSkyMid", "skyMid"], ["uHaze", "haze"], ["uGlow", "glow"],
+const LOOK_U = [["uSkyTop", "skyTop"], ["uSkyMid", "skyMid"], ["uSkyLow", "skyLow"], ["uSkyHz", "skyHz"],
+  ["uHaze", "haze"], ["uGlow", "glow"], ["uSun", "sun"],
   ["uBody", "body"], ["uDeep", "deep"], ["uGlint", "glint"], ["uWordCol", "word"],
-  ["uIsle", "isle"], ["uIsleFar", "isleFar"], ["uCloud", "cloud"]];
+  ["uIsle", "isle"], ["uIsleFar", "isleFar"], ["uCloud", "cloud"], ["uCloudLit", "cloudLit"]];
 
 // the crest's own palm (phosphor tree-palm, MIT), planted on the islands
 const PALM = new Path2D("M239.84 60.33a8 8 0 0 1-4.65 5.75L179 90.55a71.42 71.42 0 0 1 43.36 33.21a70.64 70.64 0 0 1 7.2 54.32a8 8 0 0 1-12.56 4.28l-81-61.68V224a8 8 0 0 1-16 0V120.68l-81 61.68a8 8 0 0 1-12.57-4.28a70.64 70.64 0 0 1 7.2-54.32A71.42 71.42 0 0 1 77 90.55L20.81 66.08a8 8 0 0 1-2.6-12.85a66.86 66.86 0 0 1 97.74 0a72.2 72.2 0 0 1 12 17a72.2 72.2 0 0 1 12.05-17a66.86 66.86 0 0 1 97.74 0a8 8 0 0 1 2.1 7.1");
@@ -267,14 +293,23 @@ export function startSea(canvas, opts) {
     wctx.globalCompositeOperation = "lighter";
     wctx.fillStyle = "#f00";
     wctx.fillText(wordEl.textContent, wr.left - cr.left + parseFloat(cs.textIndent || 0), baseline);
+    // islands sit in the open water beside the word, sized to the gap they have
     const cw = cr.width, ih = Math.min(cr.height * 0.11, cw * 0.09);
-    wctx.fillStyle = "#00f";
-    island(wctx, cw * 0.1, baseline + 0.5, ih * 2.2, ih * 0.55, [{ x: 0.02, y: 0.28, s: 0.62, r: -0.08 }]);
-    wctx.fillStyle = "#0f0";
-    island(wctx, cw * 0.87, baseline + 0.5, ih * 3.2, ih, [
-      { x: -0.08, y: 0.28, s: 0.95, r: -0.1 },
-      { x: 0.1, y: 0.3, s: 0.7, r: 0.12, flip: true },
-    ]);
+    const gapL = wr.left - cr.left, gapR = cr.right - wr.right;
+    const fit = (gap, w, h) => { const k = Math.min(1, (gap * 0.86) / w); return [w * k, h * k]; };
+    if (gapL > 34) {
+      const [w, h] = fit(gapL, ih * 2.2, ih * 0.55);
+      wctx.fillStyle = "#00f";
+      island(wctx, gapL / 2, baseline + 0.5, w, h, [{ x: 0.02, y: 0.28, s: 0.62, r: -0.08 }]);
+    }
+    if (gapR > 34) {
+      const [w, h] = fit(gapR, ih * 3.2, ih);
+      wctx.fillStyle = "#0f0";
+      island(wctx, cw - gapR / 2, baseline + 0.5, w, h, [
+        { x: -0.08, y: 0.28, s: 0.95, r: -0.1 },
+        { x: 0.1, y: 0.3, s: 0.7, r: 0.12, flip: true },
+      ]);
+    }
     wctx.restore();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
@@ -288,6 +323,7 @@ export function startSea(canvas, opts) {
       for (const [n, k] of LOOK_U) gl.uniform3fv(u(n), hex(l[k]));
       gl.uniform1f(u("uStars"), l.stars);
       gl.uniform1f(u("uClouds"), l.clouds);
+      gl.uniform1f(u("uSunE"), l.sunE);
     });
   }
 
