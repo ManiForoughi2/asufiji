@@ -1,5 +1,5 @@
-import { mountShader, prefersReducedMotion } from "./shaders.js?v=cd5e3bd0";
-import { startSea } from "./sea.js?v=cd5e3bd0";
+import { mountShader, prefersReducedMotion } from "./shaders.js?v=0772ce7f";
+import { startSea } from "./sea.js?v=0772ce7f";
 
 const root = document.documentElement;
 const reduced = prefersReducedMotion();
@@ -30,6 +30,8 @@ function retint() {
 const heroEl = document.querySelector(".hero");
 const seaCanvas = document.getElementById("sea");
 const sea = seaCanvas ? startSea(seaCanvas, { getTheme: theme, reduced, hero: heroEl, word: document.querySelector(".word:not(.word-refl)") }) : null;
+// the title face may land after the first paint; repaint the reflection with the real letters
+document.fonts?.ready.then(() => sea?.redraw());
 if (sea) heroEl.classList.add("gl-sea");
 
 mount(document.getElementById("sh-rush"), "pulsingBorder", (p) => ({

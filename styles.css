@@ -5,6 +5,8 @@
 @font-face { font-family: "Recia"; src: url("assets/fonts/recia-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 @font-face { font-family: "Recia"; src: url("assets/fonts/recia-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
 @font-face { font-family: "Recia"; src: url("assets/fonts/recia-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+/* titles only: the J's hook is raised so it sits on the waterline with the other capitals */
+@font-face { font-family: "Recia Display"; src: url("assets/fonts/recia-display.woff2") format("woff2"); font-weight: 600; font-display: swap; }
 
 :root {
   --serif: "Recia", "Iowan Old Style", Georgia, serif;
@@ -154,7 +156,7 @@ svg { display: block; }
 .word {
   position: absolute; left: 50%; translate: -50% 0;
   top: calc(var(--hz) - .87em);
-  font: 600 var(--kw)/1 var(--serif); letter-spacing: .02em; text-indent: .02em;
+  font: 600 var(--kw)/1 "Recia Display", var(--serif); letter-spacing: .02em; text-indent: .02em;
   color: var(--word); white-space: nowrap;
   transition: color .6s var(--ease);
 }

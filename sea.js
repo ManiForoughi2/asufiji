@@ -193,23 +193,6 @@ void main() {
   if (uPlateOn > 0.5) col = mix(col, uHorizon, mist * 0.3);
   else col = mix(col, mix(uHaze, uSkyHz, exp(-mx * mx)) + uGlow * 0.12 * exp(-mx * mx), mist * 0.5);
 
-  // whatever of the wordmark hangs below the waterline (the J) is seen through the water:
-  // bent by the waves, tinted by the sea, fading out with depth
-#ifndef SKY
-  // drawn after the mist: the J is right in front of us, not out at the horizon
-  if (px.y < uWordRes.y) {
-    float dd = clamp((px.y - uWordHz) / max(uWordRes.y - uWordHz, 1.0), 0.0, 1.0);
-    float sw = (0.6 + 4.0 * dd) * uQ;                   // a slow sway that grows with depth
-    float ox = sin(px.y * 0.09 / uQ - uTime * 1.6) * sw + sin(px.y * 0.031 / uQ + uTime * 0.9) * sw * 0.8;
-    float a = texture2D(uWord, (px + vec2(ox, 0.0)) / uWordRes).r;
-    if (a > 0.001) {
-      float vis = 0.85 - 0.6 * dd;                      // clear near the surface, dimmer with depth
-      vec3 under = mix(uWordCol, col, 0.22 + 0.3 * dd) * vec3(0.9, 0.97, 1.0);
-      col = mix(col, under, a * vis);
-    }
-  }
-#endif
-
   float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
   col += (dn - 0.5) / 255.0;
   gl_FragColor = vec4(col, 1.0);
@@ -486,9 +469,21 @@ export function startSea(canvas, opts) {
       gl.uniform1f(u("uF"), Math.max(W, H * 1.1) * 0.95);
       gl.uniform1f(u("uQ"), q);
     });
+    fitWord();
     paintWord();
     usePlate();
     applyLook(nightNow);
+  }
+
+  // the islands are baked into the sky, so the title shrinks to fit the open water between them
+  const heroEl = wordEl.closest(".hero");
+  function fitWord() {
+    if (!heroEl) return;
+    heroEl.style.removeProperty("--kw");
+    const inner = shapeFor() === "tall" ? 0.16 : 0.29;      // tan of the islands' inner edges
+    const room = 2 * inner * Math.max(canvas.clientWidth, canvas.clientHeight * 1.1) * 0.95;
+    const w = wordEl.getBoundingClientRect().width;
+    if (w > room) heroEl.style.setProperty("--kw", `${parseFloat(getComputedStyle(wordEl).fontSize) * room / w}px`);
   }
 
   function draw(sec) {
