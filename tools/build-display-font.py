@@ -1,24 +1,46 @@
-# Rebuilds assets/fonts/recia-display.woff2 (titles only): J hook and Q tail raised onto the baseline.
-# usage: python3 tools/build-display-font.py 0,0.3,0.6,0.9,1,1,1,1,1,1,1,0.8,0.5,0.2,0   then bump ?v= on its URL
-
+# Rebuilds assets/fonts/recia-display.woff2, the face used only by the big page titles.
+# Nothing may hang below the waterline, so: the J's hook is raised onto the baseline, and the Q
+# is the O's bowl plus a drawn tail that tapers out along the baseline (inscriptional style).
+# usage: python3 tools/build-display-font.py [out.woff2]   then bump ?v= on its URL (styles.css + preloads)
 import sys
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables import ttProgram
+from fontTools.pens.ttGlyphPen import TTGlyphPen
+from fontTools.pens.recordingPen import DecomposingRecordingPen
 from fontTools import subset
-W=dict(zip(range(9,24),[float(v) for v in sys.argv[1].split(',')]))
-f=TTFont('assets/fonts/recia-600.woff2'); glyf=f['glyf']
-def edit(name, fn):
-    g=glyf[name]; c,_,_=g.getCoordinates(glyf)
-    for i,(x,y) in enumerate(c): c[i]=fn(i,x,y)
-    g.coordinates=c; p=ttProgram.Program(); p.fromBytecode(b''); g.program=p; g.recalcBounds(glyf)
-edit('J', lambda i,x,y: (x, y+196) if y<400 else (x,y))
-DY={10:40,11:150,12:205,13:210,14:200,15:200,16:195,17:190,18:180,22:73}
-edit('Q', lambda i,x,y: (x+150*W.get(i,0), y+DY.get(i,166)) if 10<=i<=22 else (x,y))
-for r in f['name'].names:
-    if r.nameID in (1,4,16):
-        try: r.string=str(r.toUnicode()).replace('Recia','Recia Display')
+
+out = sys.argv[1] if len(sys.argv) > 1 else "assets/fonts/recia-display.woff2"
+f = TTFont("assets/fonts/recia-600.woff2")
+glyf = f["glyf"]
+gs = f.getGlyphSet()
+
+def finish(name, g):
+    p = ttProgram.Program(); p.fromBytecode(b""); g.program = p
+    glyf[name] = g; g.recalcBounds(glyf)
+
+# J: hook points (all below y=400) lifted so the hook rests on the baseline
+g = glyf["J"]; c, _, _ = g.getCoordinates(glyf)
+for i, (x, y) in enumerate(c):
+    if y < 400: c[i] = (x, y + 196)
+g.coordinates = c; finish("J", g)
+
+# Q: the O, then a tail. Clockwise like an outer contour so the overlap fills.
+pen = TTGlyphPen(gs)
+rec = DecomposingRecordingPen(gs); gs["O"].draw(rec); rec.replay(pen)
+pen.moveTo((430, 150))                      # top edge, starting inside the bowl
+pen.qCurveTo((560, 128), (690, 52))         # crosses the bowl's bottom stroke
+pen.qCurveTo((820, 6), (965, 2))            # tip, on the baseline
+pen.qCurveTo((800, -14), (640, -12))        # bottom edge back along the baseline
+pen.qCurveTo((500, -6), (400, 110))         # up through the stroke
+pen.closePath()
+finish("Q", pen.glyph())
+f["hmtx"]["Q"] = (glyf["Q"].xMax + 20, 48)
+
+for r in f["name"].names:
+    if r.nameID in (1, 4, 16):
+        try: r.string = str(r.toUnicode()).replace("Recia", "Recia Display")
         except Exception: pass
-o=subset.Options(); o.flavor='woff2'; o.layout_features=['kern','liga','case']; o.hinting=False
-s=subset.Subsetter(o); s.populate(text='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 '); s.subset(f)
-f['hmtx']['Q']=(max(791,glyf['Q'].xMax+28),50)
-f.flavor='woff2'; f.save('assets/fonts/recia-display.woff2'); print('Q',glyf['Q'].yMin,glyf['Q'].xMax)
+o = subset.Options(); o.flavor = "woff2"; o.layout_features = ["kern", "liga", "case"]; o.hinting = False
+s = subset.Subsetter(o); s.populate(text="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "); s.subset(f)
+f.flavor = "woff2"; f.save(out)
+print("Q", glyf["Q"].yMin, glyf["Q"].xMax, f["hmtx"]["Q"])
