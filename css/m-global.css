@@ -12,7 +12,7 @@
   /* ---------- home hero: crest centered, FIJI standing a touch above center ---------- */
   .hero:not(.hero-sub) {
     --hz: 54%;
-    --kw: min(calc((100vw - 2 * var(--g)) * .78 / 1.78), 31svh);
+    --kw: min(calc((100vw - 2 * var(--g)) * .72 / 1.78), 31svh);
     height: 100svh; min-height: 520px;
   }
   .crest-top {

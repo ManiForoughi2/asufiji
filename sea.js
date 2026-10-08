@@ -40,7 +40,14 @@ uniform float uF;         // focal length, device px
 uniform float uQ;         // render scale, keeps the star grid in full-res px
 uniform float uStars;     // 1 at night, 0 by day
 uniform sampler2D uWord;  // word alpha for the area above the horizon; bottom row = horizon
+uniform sampler2D uPlateDay, uPlateNight; // blender-rendered sky + islands; bottom row = horizon (see asufiji-render)
+uniform float uNight;     // 0 day .. 1 night, animated on theme switch
+uniform float uPlateOn;   // 1 once the render has loaded
+uniform vec2 uPlateT;     // the render's half-width and full-height, in tan(angle)
+uniform vec2 uSunT;       // the rendered sun, in tan(angle) (x right, y up)
+uniform vec3 uHorizon;    // the render's horizon color with the islands left out
 uniform vec2 uWordRes;
+uniform float uWordHz;    // the horizon's row in the word texture (it also holds what hangs below)
 uniform float uPh[12];    // per-wave phase at uTime, wrapped on the cpu
 uniform vec3 uSkyTop, uSkyMid, uHaze, uGlow, uBody, uDeep, uGlint, uWordCol;
 uniform vec3 uIsle, uIsleFar, uCloud;   // island silhouettes and cloud tint
@@ -50,6 +57,13 @@ uniform float uClouds;                  // cloud amount
 // scene texture (premultiplied): r = wordmark, g = near island, b = far island
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+// the blender render, looked up by view direction so any screen shape maps onto it
+vec3 plate(vec3 d) {
+  vec2 t = d.xy / d.z;
+  vec2 uv = vec2(0.5 + t.x / (2.0 * uPlateT.x), 1.0 - clamp(t.y, 0.0, uPlateT.y) / uPlateT.y);
+  return mix(texture2D(uPlateDay, uv).rgb, texture2D(uPlateNight, uv).rgb, uNight);
+}
 
 // the sun sits low, straight behind the crest
 vec3 sunDir() { return normalize(vec3(0.0, uSunE, 1.0)); }
@@ -93,6 +107,18 @@ void main() {
 
 #ifdef SKY
   if (dy <= 0.0) discard;
+  if (uPlateOn > 0.5) {
+    col = plate(d);
+    // stars come out only in the dark upper sky of the night render
+    vec2 sp = px / (uQ * 3.0);
+    float h = hash(floor(sp));
+    if (h > 0.997) {
+      float dark = 1.0 - smoothstep(0.08, 0.3, dot(col, vec3(0.3, 0.5, 0.2)));
+      float tw = 0.6 + 0.4 * sin(uTime * (1.0 + h * 3.0) + h * 40.0);
+      float core = smoothstep(0.5, 0.0, length(fract(sp) - 0.5));
+      col += vec3(0.92, 0.9, 0.85) * core * tw * dark * uStars * smoothstep(0.08, 0.3, d.y) * (h - 0.997) * 200.0;
+    }
+  } else {
   col = sky(d);
   // a sparse field of stars, thinning toward the horizon haze
   vec2 sp = px / (uQ * 3.0);
@@ -122,6 +148,7 @@ void main() {
   vec4 sc = texture2D(uWord, vec2(px.x / uWordRes.x, px.y / uWordRes.y));
   col = mix(col, uIsleFar, sc.b);
   col = mix(col, uIsle, sc.g);
+  }
 #else
   if (dy > 0.0) discard;
   float t = 1.0 / -d.y;                                      // eye height 1
@@ -136,29 +163,52 @@ void main() {
 
   float up = r.y / r.z * uF;
   float xs = uRes.x * 0.5 + r.x / r.z * uF;
-  vec2 wuv = vec2(xs / uWordRes.x, 1.0 - up / uWordRes.y);
+  vec2 wuv = vec2(xs / uWordRes.x, (uWordHz - up) / uWordRes.y);
   vec4 sc = vec4(0.0);
   if (wuv.x > 0.0 && wuv.x < 1.0 && wuv.y > 0.0 && wuv.y < 1.0) sc = texture2D(uWord, wuv);
-  vec3 refl = sky(r) * 0.85;
-  refl = mix(refl, uIsleFar * 0.9, sc.b);
-  refl = mix(refl, uIsle * 0.9, sc.g);
+  vec3 refl;
+  if (uPlateOn > 0.5) refl = plate(r) * 0.86;
+  else {
+    refl = sky(r) * 0.85;
+    refl = mix(refl, uIsleFar * 0.9, sc.b);
+    refl = mix(refl, uIsle * 0.9, sc.g);
+  }
   refl = mix(refl, uWordCol * 0.86, sc.r * 0.74);
 
   float depth01 = clamp(-dy / (uRes.y - uHz), 0.0, 1.0);
   vec3 body = mix(uBody, uDeep, depth01) * (0.85 + 0.15 * n.z);
   col = mix(body, refl, fres);
 
-  vec3 L = normalize(vec3(0.0, max(uSunE, 0.012), 1.0));     // the sun, or its afterglow once set
+  vec3 L = normalize(uPlateOn > 0.5 ? vec3(uSunT.x, max(uSunT.y, 0.012), 1.0) : vec3(0.0, max(uSunE, 0.012), 1.0));
   float s = pow(max(dot(r, L), 0.0), 900.0);
   col += uGlint * s * 1.6 * (1.0 - smoothstep(0.0, 1.0, fp * 0.08));
 
-  col = mix(uHaze, col, exp(-t * 0.0045));                 // sea fades into the mist
+  vec3 far = uPlateOn > 0.5 ? uHorizon : uHaze;            // the horizon's own color
+  col = mix(far, col, exp(-t * 0.0045));                   // sea fades into the mist
 #endif
 
   // one band of mist straddles the horizon so sky and sea meet without a seam
   float mist = exp(-abs(dy) / (uRes.y * 0.035));
   float mx = (px.x / uRes.x - 0.5) * 2.4;
-  col = mix(col, mix(uHaze, uSkyHz, exp(-mx * mx)) + uGlow * 0.12 * exp(-mx * mx), mist * 0.5);
+  if (uPlateOn > 0.5) col = mix(col, uHorizon, mist * 0.3);
+  else col = mix(col, mix(uHaze, uSkyHz, exp(-mx * mx)) + uGlow * 0.12 * exp(-mx * mx), mist * 0.5);
+
+  // whatever of the wordmark hangs below the waterline (the J) is seen through the water:
+  // bent by the waves, tinted by the sea, fading out with depth
+#ifndef SKY
+  // drawn after the mist: the J is right in front of us, not out at the horizon
+  if (px.y < uWordRes.y) {
+    float dd = clamp((px.y - uWordHz) / max(uWordRes.y - uWordHz, 1.0), 0.0, 1.0);
+    float sw = (0.6 + 4.0 * dd) * uQ;                   // a slow sway that grows with depth
+    float ox = sin(px.y * 0.09 / uQ - uTime * 1.6) * sw + sin(px.y * 0.031 / uQ + uTime * 0.9) * sw * 0.8;
+    float a = texture2D(uWord, (px + vec2(ox, 0.0)) / uWordRes).r;
+    if (a > 0.001) {
+      float vis = 0.85 - 0.6 * dd;                      // clear near the surface, dimmer with depth
+      vec3 under = mix(uWordCol, col, 0.22 + 0.3 * dd) * vec3(0.9, 0.97, 1.0);
+      col = mix(col, under, a * vis);
+    }
+  }
+#endif
 
   float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
   col += (dn - 0.5) / 255.0;
@@ -263,6 +313,7 @@ export function startSea(canvas, opts) {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enable(gl.SCISSOR_TEST);
 
+    texs.day = texs.night = null; shapeNow = "";   // a restored context needs the renders uploaded again
     tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -273,6 +324,110 @@ export function startSea(canvas, opts) {
 
   const each = (fn) => { for (const P of progs) { gl.useProgram(P.p); fn(P.u); } };
 
+  // ---- the blender render (asufiji-render/build_scene.py) ----
+  // wide: desktop/landscape framing; tall: phones, where the islands sit just outside the word.
+  // sun = the day render's sun, moon = the night render's moon, both in tan(angle)
+  const PLATES = {
+    wide: { tx: 0.56, tv: 0.672, sun: [0.1228, 0.196], moon: [-0.38, 0.27] },
+    tall: { tx: 0.25, tv: 0.66, sun: [0.1228, 0.196], moon: [-0.13, 0.25] },
+  };
+  const imgs = new Map();                       // key -> decoded image (or null while loading)
+  const texs = { day: null, night: null };
+  let shapeNow = "", horizon = { day: [0.6, 0.6, 0.62], night: [0.1, 0.12, 0.2] };
+  let nightNow = getTheme() === "light" ? 0 : 1, fadeRaf = 0;
+
+  const shapeFor = () => {
+    const edge = (canvas.clientWidth / 2) / (Math.max(canvas.clientWidth, canvas.clientHeight * 1.1) * 0.95);
+    return edge <= PLATES.tall.tx ? "tall" : "wide";
+  };
+  function horizonOf(img) {
+    const c = document.createElement("canvas"); c.width = 256; c.height = 8;
+    const x = c.getContext("2d", { willReadFrequently: true });
+    x.drawImage(img, 0, img.height - 8, img.width, 8, 0, 0, 256, 8);
+    const px = x.getImageData(0, 0, 256, 8).data;
+    let r = 0, g = 0, b = 0, n = 0, top = 0;
+    for (let i = 0; i < px.length; i += 4) top = Math.max(top, px[i] + px[i + 1] + px[i + 2]);
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i] + px[i + 1] + px[i + 2] < top * 0.45) continue;    // skip the island silhouettes
+      r += px[i]; g += px[i + 1]; b += px[i + 2]; n++;
+    }
+    return n ? [r / n / 255, g / n / 255, b / n / 255] : [0.5, 0.45, 0.45];
+  }
+  function upload(which, img, unit) {
+    if (!texs[which]) texs[which] = gl.createTexture();
+    gl.activeTexture(unit);
+    gl.bindTexture(gl.TEXTURE_2D, texs[which]);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0);
+    horizon[which] = img.horizon || (img.horizon = horizonOf(img));
+  }
+  // load both renders for this screen shape, the one on screen first
+  function usePlate() {
+    const shape = shapeFor();
+    const order = getTheme() === "light" ? ["day", "night"] : ["night", "day"];
+    const fresh = shape !== shapeNow;
+    shapeNow = shape;
+    for (const which of order) {
+      const key = `${shape}-${which}`;
+      const img = imgs.get(key);
+      if (img) { if (fresh || !texs[which] || texs[which].key !== key) { upload(which, img, which === "day" ? gl.TEXTURE1 : gl.TEXTURE2); texs[which].key = key; } continue; }
+      if (imgs.has(key)) continue;
+      imgs.set(key, null);
+      const im = new Image();
+      im.decoding = "async";
+      im.src = new URL(`assets/sky/${key}.webp`, import.meta.url).href;
+      im.decode().then(() => { imgs.set(key, im); if (!lost) { usePlate(); applyLook(nightNow); draw(performance.now() / 1000 * 0.55); } })
+        .catch(() => imgs.delete(key));
+    }
+    // a missing half borrows the other until it arrives, so the shader never samples an empty unit
+    const haveDay = texs.day && texs.day.key === `${shape}-day`, haveNight = texs.night && texs.night.key === `${shape}-night`;
+    const on = getTheme() === "light" ? haveDay : haveNight;
+    each((u) => {
+      gl.uniform1i(u("uWord"), 0);
+      gl.uniform1i(u("uPlateDay"), haveDay ? 1 : 2);
+      gl.uniform1i(u("uPlateNight"), haveNight ? 2 : 1);
+      gl.uniform1f(u("uPlateOn"), on ? 1 : 0);
+      gl.uniform2f(u("uPlateT"), PLATES[shape].tx, PLATES[shape].tv);
+    });
+  }
+
+  // every theme-driven uniform, blended by how far into night we are (0 day .. 1 night)
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const lerp3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+  function applyLook(t) {
+    const d = LOOK.light, n = LOOK.dark, p = PLATES[shapeNow || shapeFor()];
+    each((u) => {
+      for (const [name, k] of LOOK_U) gl.uniform3fv(u(name), lerp3(hex(d[k]), hex(n[k]), t));
+      gl.uniform1f(u("uStars"), lerp(d.stars, n.stars, t));
+      gl.uniform1f(u("uClouds"), lerp(d.clouds, n.clouds, t));
+      gl.uniform1f(u("uSunE"), lerp(d.sunE, n.sunE, t));
+      gl.uniform1f(u("uNight"), t);
+      gl.uniform2fv(u("uSunT"), lerp3([...p.sun, 0], [...p.moon, 0], t).slice(0, 2));
+      gl.uniform3fv(u("uHorizon"), lerp3(horizon.day, horizon.night, t));
+    });
+  }
+  function setLook() {
+    const target = getTheme() === "light" ? 0 : 1;
+    usePlate();
+    cancelAnimationFrame(fadeRaf);
+    if (reduced || target === nightNow || !progs) { nightNow = target; applyLook(nightNow); return; }
+    // a slow sunrise / nightfall: ease the whole scene across about a second
+    const from = nightNow, t0 = performance.now(), dur = 1100;
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur), e = k * k * (3 - 2 * k);
+      nightNow = lerp(from, target, e);
+      applyLook(nightNow);
+      if (!lost) draw(now / 1000 * 0.55);
+      if (k < 1) fadeRaf = requestAnimationFrame(step);
+    };
+    fadeRaf = requestAnimationFrame(step);
+  }
+
   // horizon = the word's baseline; paint the word into a texture of the area above it
   function paintWord() {
     const cr = canvas.getBoundingClientRect();
@@ -282,7 +437,7 @@ export function startSea(canvas, opts) {
     const baseline = wr.top - cr.top + fs * 0.87;          // line-height 1, Recia metrics
     hz = baseline * dpr;
     wc.width = Math.max(1, Math.round(cr.width * dpr));
-    wc.height = Math.max(1, Math.round(baseline * dpr));
+    wc.height = Math.max(1, Math.round((baseline + fs * 0.32) * dpr));   // room for the descender under the water
     wctx.clearRect(0, 0, wc.width, wc.height);
     wctx.save();
     wctx.scale(dpr, dpr);
@@ -314,18 +469,9 @@ export function startSea(canvas, opts) {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, wc);
-    each((u) => { gl.uniform1f(u("uHz"), hz); gl.uniform2f(u("uWordRes"), wc.width, wc.height); });
+    each((u) => { gl.uniform1f(u("uHz"), hz); gl.uniform2f(u("uWordRes"), wc.width, wc.height); gl.uniform1f(u("uWordHz"), baseline * dpr); });
   }
 
-  function setLook() {
-    const l = LOOK[getTheme()] || LOOK.dark;
-    each((u) => {
-      for (const [n, k] of LOOK_U) gl.uniform3fv(u(n), hex(l[k]));
-      gl.uniform1f(u("uStars"), l.stars);
-      gl.uniform1f(u("uClouds"), l.clouds);
-      gl.uniform1f(u("uSunE"), l.sunE);
-    });
-  }
 
   function size() {
     const q = LEVELS[level].q;
@@ -341,6 +487,8 @@ export function startSea(canvas, opts) {
       gl.uniform1f(u("uQ"), q);
     });
     paintWord();
+    usePlate();
+    applyLook(nightNow);
   }
 
   function draw(sec) {
