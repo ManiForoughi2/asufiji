@@ -125,13 +125,26 @@ document.querySelectorAll(".card-art").forEach((art) => {
     });
     art.addEventListener("pointerleave", () => { art.classList.remove("lens"); stop(); });
   } else {
-    // touch: a tap opens the whole print, another tap closes it
+    // touch: the top card of the deck opens on its own (see frame); a tap toggles it by hand
+    const hint = document.createElement("span");
+    hint.className = "card-hint";
+    hint.setAttribute("aria-hidden", "true");
+    hint.innerHTML = '<svg viewBox="0 0 9 10"><path fill="currentColor" d="M0 0l9 5-9 5z"/></svg>Tap to watch';
+    art.append(hint);
     art.addEventListener("click", () => {
       const open = art.classList.toggle("open");
+      art.dataset.shut = open ? "" : "1";
       if (open) play(); else stop();
     });
   }
 });
+const setOpen = (art, on) => {
+  if (art.classList.contains("open") === on) return;
+  art.classList.toggle("open", on);
+  const v = art.querySelector("video");
+  if (on) { if (!reduced) { liveVid = v; v.play().catch(() => {}); } }
+  else { v.pause(); if (liveVid === v) liveVid = null; }
+};
 // browsers pause video in background tabs; resume on return
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") liveVid?.play().catch(() => {});
@@ -141,15 +154,30 @@ document.addEventListener("visibilitychange", () => {
 const hero = document.querySelector(".hero");
 const cards = [...document.querySelectorAll(".card")];
 const arts = cards.map((c) => c.querySelector(".art-shader"));
+const cardArts = cards.map((c) => c.querySelector(".card-art"));
 const compass = document.querySelector(".week-compass");
 const navLinks = [...document.querySelectorAll(".rail-link")];
-const navSections = navLinks.map((a) => document.querySelector(a.getAttribute("href")));
+
+// phone menu
+const rail = document.querySelector(".rail");
+const menuBtn = document.querySelector(".rail-menu");
+menuBtn?.addEventListener("click", () => {
+  const open = rail.classList.toggle("open");
+  menuBtn.setAttribute("aria-expanded", String(open));
+  menuBtn.textContent = open ? "Close" : "Menu";
+});
+const closeMenu = () => { if (rail?.classList.contains("open")) menuBtn.click(); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+// close on a link tap (same-page anchors don't navigate) and on any tap outside the rail
+rail?.querySelector(".rail-links")?.addEventListener("click", (e) => { if (e.target.closest("a")) closeMenu(); });
+document.addEventListener("pointerdown", (e) => { if (!e.target.closest(".rail")) closeMenu(); }, { passive: true });
 
 let queued = false;
 function frame() {
   queued = false;
   const vh = window.innerHeight;
   const y = window.scrollY;
+  let top = -1;
 
   if (hero && !reduced) hero.style.setProperty("--hp", clamp(y / (vh * 0.9), 0, 1).toFixed(4));
 
@@ -164,9 +192,20 @@ function frame() {
       p = clamp(1 - (nr.top - r.top) / card.offsetHeight, 0, 1);
     }
     card.style.setProperty("--p", p.toFixed(4));
+    if (p < 0.5 && r.top < vh * 0.55 && r.bottom > vh * 0.55) top = i;
     if (!reduced && arts[i]) {
       const off = (r.top + r.height / 2 - vh / 2) / vh;
       arts[i].style.setProperty("--py", (off * -36).toFixed(2) + "px");
+    }
+  }
+
+  // touch: only the card on top of the deck shows its film; the rest pause
+  if (!finePtr) {
+    for (let i = 0; i < cards.length; i++) {
+      const art = cardArts[i];
+      if (!art) continue;
+      if (i !== top) { art.dataset.shut = ""; setOpen(art, false); }
+      else if (art.dataset.shut !== "1") setOpen(art, true);
     }
   }
 
@@ -175,9 +214,6 @@ function frame() {
     if (r.bottom > 0 && r.top < vh) compass.style.setProperty("--rot", ((r.top + r.height / 2 - vh / 2) * -0.08).toFixed(2) + "deg");
   }
 
-  let active = -1;
-  navSections.forEach((s, i) => { if (s && s.getBoundingClientRect().top < vh * 0.45) active = i; });
-  navLinks.forEach((a, i) => a.classList.toggle("is-active", i === active));
 }
 const queue = () => { if (!queued) { queued = true; requestAnimationFrame(frame); } };
 addEventListener("scroll", queue, { passive: true });

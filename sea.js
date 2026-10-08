@@ -1,192 +1,312 @@
-// night sea under the crest. a small WebGL ocean: perspective wave field seen from just
-// above the surface, fresnel mirror toward the horizon, and the actual FIJI wordmark
-// reflected through the moving wave normals. returns null if WebGL is unavailable.
+// night scene behind the crest: one WebGL pass draws the sky AND the sea from the same light
+// model, so the reflection samples exactly the sky it sits under. perspective wave field from
+// just above the surface, fresnel mirror toward the horizon, mist across the horizon line, a low
+// glow behind the word, and the real DOM wordmark reflected through the wave normals.
+// returns null if WebGL is unavailable (the CSS sky + DOM reflection stay as the fallback).
 
 const VERT = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
 
-const FRAG = `
+// 12 waves, constants baked on the cpu: dir, k, w never change, only the phase moves
+const TAU = Math.PI * 2;
+const WAVES = [];
+for (let i = 0, L = 9; i < 12; i++, L *= 0.7) {
+  const ang = Math.sin(i * 12.9898) * 0.7, k = TAU / L;
+  WAVES.push({ L, dx: Math.sin(ang), dz: Math.cos(ang), k, w: Math.sqrt(9.8 * k), off: i * 1.7 });
+}
+const f = (x) => x.toPrecision(9);
+const AK = 0.011 * TAU;                                     // amplitude * k, same for every wave
+
+// smoothstep(4fp, 14fp, L) == s(L / 10fp - 0.4); waves shorter than 4fp are fully attenuated and
+// they only get shorter, so stop there (far pixels near the horizon need just a few)
+const WAVE_GLSL = `
+vec2 waveGrad(vec2 xz, float fp) {
+  vec2 g = vec2(0.0);
+  float iv = 0.1 / fp, f4 = 4.0 * fp, a;
+${WAVES.map((w, i) => `  if (f4 >= ${f(w.L)}) return g;
+  a = clamp(${f(w.L)} * iv - 0.4, 0.0, 1.0);
+  g += vec2(${f(w.dx * AK)}, ${f(w.dz * AK)}) * (cos(dot(vec2(${f(w.dx * w.k)}, ${f(w.dz * w.k)}), xz) + uPh[${i}]) * a * a * (3.0 - 2.0 * a));`).join("\n")}
+  return g;
+}`;
+
+// one source, two programs: sky pixels never pay for (or hold registers for) the sea path
+const FRAG = (part) => `
+#define ${part}
 precision highp float;
-uniform vec2 uRes;        // sea canvas size, device px (top edge = horizon)
+uniform vec2 uRes;        // canvas size, device px
+uniform float uHz;        // horizon, device px from the top (= the word's baseline)
 uniform float uTime;
 uniform float uF;         // focal length, device px
-uniform sampler2D uWord;  // the area above the horizon: word alpha, bottom row = horizon
-uniform vec2 uWordRes;    // that area's size, device px
-uniform vec3 uSkyHz, uSkyTop, uBody, uDeep, uGlint, uWordCol;
+uniform float uQ;         // render scale, keeps the star grid in full-res px
+uniform float uStars;     // 1 at night, 0 by day
+uniform sampler2D uWord;  // word alpha for the area above the horizon; bottom row = horizon
+uniform vec2 uWordRes;
+uniform float uPh[12];    // per-wave phase at uTime, wrapped on the cpu
+uniform vec3 uSkyTop, uSkyMid, uHaze, uGlow, uBody, uDeep, uGlint, uWordCol;
 
-const float EYE = 1.0;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
-vec2 waveGrad(vec2 xz, float t, float fp) {
-  vec2 g = vec2(0.0);
-  float L = 9.0;
-  for (int i = 0; i < 12; i++) {
-    float fi = float(i);
-    float ang = sin(fi * 12.9898) * 0.7;                // spread around the view axis
-    vec2 dir = vec2(sin(ang), cos(ang));
-    float k = 6.2831853 / L;
-    float w = sqrt(9.8 * k);
-    float A = L * 0.011;
-    float atten = smoothstep(4.0 * fp, 14.0 * fp, L);     // drop waves smaller than a few pixels
-    float ph = dot(dir, xz) * k - w * t + fi * 1.7;
-    g += dir * (A * k * cos(ph) * atten);
-    L *= 0.70;
-  }
-  return g;
+vec3 sky(vec3 d) {
+  float e = max(d.y, 0.0);
+  vec3 c = mix(uHaze, uSkyMid, smoothstep(0.0, 0.07, e));
+  c = mix(c, uSkyTop, smoothstep(0.07, 0.5, e));
+  float g = exp(-e * 24.0) * exp(-d.x * d.x * 7.0);       // low light behind the crest
+  return c + uGlow * g * 0.6;
 }
+#ifdef SEA
+${WAVE_GLSL}
+#endif
 
 void main() {
-  vec2 px = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);   // y = distance below horizon
-  vec3 d = normalize(vec3((px.x - uRes.x * 0.5) / uF, -(px.y + 0.75) / uF, 1.0));
-  float t = EYE / -d.y;
+  vec2 px = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);   // y from the top
+  float dy = uHz - px.y;                                     // + above the horizon
+  vec3 d = normalize(vec3((px.x - uRes.x * 0.5) / uF, (dy - 0.75) / uF, 1.0));
+  vec3 col;
+
+#ifdef SKY
+  if (dy <= 0.0) discard;
+  col = sky(d);
+  // a sparse field of stars, thinning toward the horizon haze
+  vec2 sp = px / (uQ * 3.0);
+  float h = hash(floor(sp));
+  if (h > 0.9965) {
+    float tw = 0.6 + 0.4 * sin(uTime * (1.0 + h * 3.0) + h * 40.0);
+    float fade = smoothstep(0.04, 0.22, d.y);
+    float core = smoothstep(0.5, 0.0, length(fract(sp) - 0.5));
+    col += vec3(0.92, 0.9, 0.85) * core * tw * fade * uStars * (h - 0.9965) * 220.0;
+  }
+#else
+  if (dy > 0.0) discard;
+  float t = 1.0 / -d.y;                                      // eye height 1
   vec3 p = d * t;
-  float fp = t / uF;                                         // world size of one pixel here
-
-  vec2 g = waveGrad(p.xz, uTime, fp);
+  float fp = t / uF;
+  vec2 g = waveGrad(p.xz, fp);
   vec3 n = normalize(vec3(-g.x, 1.0, -g.y));
-
   vec3 r = reflect(d, n);
   r.y = max(r.y, 0.0005);
-  float fres = 0.02 + 0.98 * pow(1.0 - max(dot(-d, n), 0.0), 5.0);
+  float c = 1.0 - max(dot(-d, n), 0.0), c2 = c * c;
+  float fres = 0.02 + 0.98 * c2 * c2 * c;
 
-  // where the reflected ray lands in the scene above the horizon
-  float up = r.y / r.z * uF;                                 // px above horizon
+  float up = r.y / r.z * uF;
   float xs = uRes.x * 0.5 + r.x / r.z * uF;
-  float h01 = clamp(up / uWordRes.y, 0.0, 1.0);
-  vec3 sky = mix(uSkyHz, uSkyTop, pow(h01, 0.6));
   vec2 wuv = vec2(xs / uWordRes.x, 1.0 - up / uWordRes.y);
   float word = 0.0;
   if (wuv.x > 0.0 && wuv.x < 1.0 && wuv.y > 0.0 && wuv.y < 1.0) word = texture2D(uWord, wuv).a;
-  vec3 refl = mix(sky, uWordCol * 0.86, word * 0.74);
+  vec3 refl = mix(sky(r) * 0.85, uWordCol * 0.86, word * 0.74);
 
-  // sea body: a touch lighter where waves face the viewer
-  float depth01 = clamp(px.y / uRes.y, 0.0, 1.0);
-  vec3 body = mix(uBody, uDeep, depth01) * (0.85 + 0.3 * n.z * 0.5);
-  vec3 col = mix(body, refl, fres);
+  float depth01 = clamp(-dy / (uRes.y - uHz), 0.0, 1.0);
+  vec3 body = mix(uBody, uDeep, depth01) * (0.85 + 0.15 * n.z);
+  col = mix(body, refl, fres);
 
-  // glitter from a low light behind the crest
-  vec3 L = normalize(vec3(0.0, 0.035, 1.0));
+  vec3 L = vec3(0.0, 0.0349786, 0.999388);                   // normalize(0, 0.035, 1)
   float s = pow(max(dot(r, L), 0.0), 1400.0);
   col += uGlint * s * 1.2 * (1.0 - smoothstep(0.0, 1.0, fp * 0.08));
 
-  // distance haze into the horizon line
-  float haze = exp(-t * 0.0045);
-  col = mix(uSkyHz, col, haze);
+  col = mix(uHaze, col, exp(-t * 0.0045));                 // sea fades into the mist
+#endif
 
-  // fine dither so the gradients never band
+  // one band of mist straddles the horizon so sky and sea meet without a seam
+  float mist = exp(-abs(dy) / (uRes.y * 0.035));
+  float mx = (px.x / uRes.x - 0.5) * 2.4;
+  col = mix(col, uHaze + uGlow * 0.18 * exp(-mx * mx), mist * 0.55);
+
   float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
   col += (dn - 0.5) / 255.0;
   gl_FragColor = vec4(col, 1.0);
 }`;
 
 const LOOK = {
-  dark:  { skyHz: "#22324f", skyTop: "#0c1324", body: "#132038", deep: "#080e1b", glint: "#f4e6cc", word: "#ecdcc2" },
-  light: { skyHz: "#bccbdb", skyTop: "#ebe3d4", body: "#56779f", deep: "#3d5c85", glint: "#ffffff", word: "#19203a" },
+  dark: {
+    skyTop: "#070b17", skyMid: "#101a31", haze: "#1f2c48", glow: "#4a3f3a",
+    body: "#132038", deep: "#080e1b", glint: "#f4e6cc", word: "#ecdcc2", stars: 1,
+  },
+  light: {
+    skyTop: "#e9e1d2", skyMid: "#d6dde3", haze: "#c3cfdb", glow: "#e8d2b0",
+    body: "#56779f", deep: "#3d5c85", glint: "#ffffff", word: "#19203a", stars: 0,
+  },
 };
+const LOOK_U = [["uSkyTop", "skyTop"], ["uSkyMid", "skyMid"], ["uHaze", "haze"], ["uGlow", "glow"],
+  ["uBody", "body"], ["uDeep", "deep"], ["uGlint", "glint"], ["uWordCol", "word"]];
+
+// quality ladder for slow gpus: drop to 30fps first (waves are slow, it reads the same),
+// then render scale, never below 0.75
+const LEVELS = [{ q: 1, ms: 1000 / 60 }, { q: 1, ms: 1000 / 30 }, { q: 0.85, ms: 1000 / 30 }, { q: 0.75, ms: 1000 / 30 }];
 
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 
 export function startSea(canvas, opts) {
-  const { getTheme, reduced, hero, word: wordEl } = opts;
-  const gl = canvas.getContext("webgl", { antialias: false, alpha: false, premultipliedAlpha: false });
+  const { getTheme, reduced, word: wordEl } = opts;
+  const attrs = { antialias: false, alpha: false, premultipliedAlpha: false, depth: false, stencil: false, preserveDrawingBuffer: false };
+  const gl = canvas.getContext("webgl", attrs);
   if (!gl) return null;
 
-  const sh = (type, src) => {
-    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
-    return s;
-  };
-  let prog;
-  try {
-    prog = gl.createProgram();
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
-    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-  } catch (e) { console.warn("sea shader:", e); return null; }
-  gl.useProgram(prog);
-
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-  const loc = gl.getAttribLocation(prog, "p");
-  gl.enableVertexAttribArray(loc);
-  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = (n) => gl.getUniformLocation(prog, n);
-
-  const tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const wc = document.createElement("canvas");
   const wctx = wc.getContext("2d");
+  const ph = new Float32Array(12);
+  const px1 = new Uint8Array(4);
 
-  let dpr = 1, raf = 0, visible = true, last = 0;
+  let progs, sky, sea, tex;
+  let dpr = 1, raf = 0, visible = true, lost = false, last = 0;
+  let level = 0, W = 1, H = 1, hz = 0, acc = 0, n = 0, bad = 0;
 
-  // draw the wordmark exactly where the DOM puts it, into the above-horizon texture
+  function init() {
+    const sh = (type, src) => {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    };
+    const vs = sh(gl.VERTEX_SHADER, VERT);
+    const mk = (part) => {
+      const p = gl.createProgram();
+      gl.attachShader(p, vs);
+      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FRAG(part)));
+      gl.bindAttribLocation(p, 0, "p");
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+      const c = {};
+      return { p, u: (n) => (n in c ? c[n] : (c[n] = gl.getUniformLocation(p, n))) };
+    };
+    sky = mk("SKY"); sea = mk("SEA"); progs = [sky, sea];
+    sky.time = sky.u("uTime"); sea.time = sea.u("uTime"); sea.ph = sea.u("uPh");
+
+    // one oversized triangle covers the viewport, no diagonal seam
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.enable(gl.SCISSOR_TEST);
+
+    tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+
+  const each = (fn) => { for (const P of progs) { gl.useProgram(P.p); fn(P.u); } };
+
+  // horizon = the word's baseline; paint the word into a texture of the area above it
   function paintWord() {
-    const hr = hero.getBoundingClientRect();
     const cr = canvas.getBoundingClientRect();
-    const aboveH = cr.top - hr.top;
-    wc.width = Math.max(1, Math.round(cr.width * dpr));
-    wc.height = Math.max(1, Math.round(aboveH * dpr));
-    wctx.clearRect(0, 0, wc.width, wc.height);
     const cs = getComputedStyle(wordEl);
     const fs = parseFloat(cs.fontSize);
+    const wr = wordEl.getBoundingClientRect();
+    const baseline = wr.top - cr.top + fs * 0.87;          // line-height 1, Recia metrics
+    hz = baseline * dpr;
+    wc.width = Math.max(1, Math.round(cr.width * dpr));
+    wc.height = Math.max(1, Math.round(baseline * dpr));
+    wctx.clearRect(0, 0, wc.width, wc.height);
     wctx.save();
     wctx.scale(dpr, dpr);
     wctx.font = `${cs.fontWeight} ${fs}px ${cs.fontFamily}`;
     if ("letterSpacing" in wctx) wctx.letterSpacing = cs.letterSpacing;
     wctx.textBaseline = "alphabetic";
     wctx.fillStyle = "#fff";
-    const wr = wordEl.getBoundingClientRect();
-    // baseline sits .87em below the element's top (line-height 1, Recia metrics)
-    const x = wr.left - cr.left + parseFloat(cs.textIndent || 0);
-    const y = wr.top - hr.top + fs * 0.87;
-    wctx.fillText(wordEl.textContent, x, y);
+    wctx.fillText(wordEl.textContent, wr.left - cr.left + parseFloat(cs.textIndent || 0), baseline);
     wctx.restore();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, wc);
-    gl.uniform2f(U("uWordRes"), wc.width, wc.height);
+    each((u) => { gl.uniform1f(u("uHz"), hz); gl.uniform2f(u("uWordRes"), wc.width, wc.height); });
   }
 
   function setLook() {
     const l = LOOK[getTheme()] || LOOK.dark;
-    gl.uniform3fv(U("uSkyHz"), hex(l.skyHz));
-    gl.uniform3fv(U("uSkyTop"), hex(l.skyTop));
-    gl.uniform3fv(U("uBody"), hex(l.body));
-    gl.uniform3fv(U("uDeep"), hex(l.deep));
-    gl.uniform3fv(U("uGlint"), hex(l.glint));
-    gl.uniform3fv(U("uWordCol"), hex(l.word));
+    each((u) => {
+      for (const [n, k] of LOOK_U) gl.uniform3fv(u(n), hex(l[k]));
+      gl.uniform1f(u("uStars"), l.stars);
+    });
   }
 
   function size() {
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-    const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
-    canvas.width = w; canvas.height = h;
-    gl.viewport(0, 0, w, h);
-    gl.uniform2f(U("uRes"), w, h);
-    gl.uniform1f(U("uF"), Math.max(w, h * 1.8) * 0.95);
+    const q = LEVELS[level].q;
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5) * q;
+    W = Math.max(1, Math.round(canvas.clientWidth * dpr)); H = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (canvas.width !== W) canvas.width = W;
+    if (canvas.height !== H) canvas.height = H;
+    gl.viewport(0, 0, W, H);
+    each((u) => {
+      gl.uniform2f(u("uRes"), W, H);
+      gl.uniform1f(u("uF"), Math.max(W, H * 1.1) * 0.95);
+      gl.uniform1f(u("uQ"), q);
+    });
     paintWord();
   }
 
   function draw(sec) {
-    gl.uniform1f(U("uTime"), sec);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (lost) return;
+    for (let i = 0; i < 12; i++) ph[i] = (WAVES[i].off - WAVES[i].w * sec) % TAU;
+    // sky above the horizon row, sea below; one row of overlap, the shaders discard the extra
+    const split = Math.min(H, Math.max(0, Math.floor(H - hz - 0.5)));
+    gl.useProgram(sky.p);
+    gl.uniform1f(sky.time, sec);
+    gl.scissor(0, split, W, H - split);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.useProgram(sea.p);
+    gl.uniform1f(sea.time, sec);
+    gl.uniform1fv(sea.ph, ph);
+    gl.scissor(0, 0, W, Math.min(H, split + 1));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  // one-off gpu cost probe: a blocking 1px read waits for the frame to finish (one read per
+  // frame, or a tile gpu folds the overdrawn frames into one)
+  function probe() {
+    const sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px1);
+    draw(3.0); sync();                                       // warm up (driver compiles lazily)
+    const t0 = performance.now();
+    draw(3.0); sync(); draw(3.0); sync();
+    return (performance.now() - t0) / 2;
+  }
+
+  function pick(ms) {
+    // ~11ms leaves room at 60fps; at 30fps aim for ~22ms of gpu per frame
+    level = ms < 11 ? 0 : ms < 22 ? 1 : ms * 0.7225 < 22 ? 2 : 3;
+  }
+
+  function degrade() {
+    if (level >= LEVELS.length - 1) return;
+    const q = LEVELS[level].q;
+    level++;
+    acc = n = bad = 0;
+    if (LEVELS[level].q !== q) size();
   }
 
   function loop(now) {
     raf = requestAnimationFrame(loop);
-    if (!visible || now - last < 16) return;
+    const iv = LEVELS[level].ms, el = now - last;
+    if (el < iv * 0.75) return;
+    // watch real pacing: two windows of 30 frames well over budget means the gpu can't keep up
+    if (last && el < 250) {
+      acc += el;
+      if (++n === 30) {
+        if (acc / 30 > iv * 1.5) { if (++bad >= 2) degrade(); } else bad = 0;
+        acc = n = 0;
+      }
+    } else acc = n = 0;
     last = now;
     draw(now / 1000 * 0.55);
   }
 
-  setLook(); size(); draw(3.0);
-  (document.fonts?.ready || Promise.resolve()).then(() => { size(); draw(3.0); });
-  new ResizeObserver(() => { size(); draw(performance.now() / 1000 * 0.55); }).observe(canvas);
-  if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(canvas);
-  if (!reduced) raf = requestAnimationFrame(loop);
+  const run = (on) => {
+    if (on && !raf && !reduced && !lost) { last = 0; raf = requestAnimationFrame(loop); }
+    if (!on && raf) { cancelAnimationFrame(raf); raf = 0; }
+  };
 
-  return { redraw() { setLook(); size(); draw(performance.now() / 1000 * 0.55); } };
+  try { init(); } catch (e) { console.warn("sea shader:", e); return null; }
+  setLook(); size();
+  if (!reduced) { pick(probe()); if (LEVELS[level].q !== 1) size(); }
+  draw(3.0);
+  (document.fonts?.ready || Promise.resolve()).then(() => { size(); draw(3.0); });
+  new ResizeObserver(() => { if (!lost) { size(); draw(performance.now() / 1000 * 0.55); } }).observe(canvas);
+  if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => { visible = e.isIntersecting; run(visible); }).observe(canvas);
+  canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); lost = true; run(false); });
+  canvas.addEventListener("webglcontextrestored", () => {
+    try { init(); } catch (e) { console.warn("sea shader:", e); return; }
+    lost = false;
+    setLook(); size(); draw(performance.now() / 1000 * 0.55);
+    run(visible);
+  });
+  run(true);
+
+  return { redraw() { if (lost) return; setLook(); size(); draw(performance.now() / 1000 * 0.55); } };
 }
