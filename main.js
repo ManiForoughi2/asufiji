@@ -1,5 +1,5 @@
-import { mountShader, prefersReducedMotion } from "./shaders.js?v=a6c659c4";
-import { startSea } from "./sea.js?v=a6c659c4";
+import { mountShader, prefersReducedMotion } from "./shaders.js?v=d3045b51";
+import { startSea } from "./sea.js?v=d3045b51";
 
 const root = document.documentElement;
 const reduced = prefersReducedMotion();
@@ -213,65 +213,113 @@ document.querySelectorAll("form.login").forEach((form) => {
 });
 
 // ---------- film postcards: play while on screen ----------
+// every video paints its own first frame underneath, so nothing flashes dark while it starts
+document.querySelectorAll("video[poster]").forEach((v) => {
+  v.style.background = `#19203a center / cover no-repeat url("${v.getAttribute("poster")}")`;
+});
 const films = [...document.querySelectorAll(".frame video")];
 const frames = [...document.querySelectorAll(".frame")];
 const filmRow = document.querySelector(".frames");
 const filmSection = document.querySelector(".film");
-// phones get a swipe row (m-home.css); keep in step with its breakpoint
+// phones get an endless swipe row (m-home.css); keep in step with its breakpoint
 const filmSwipe = matchMedia("(max-width: 760px)");
-if (films.length && !reduced && "IntersectionObserver" in window) {
-  // desktop: each postcard plays while it's on screen
-  // phone: the whole row plays while the section is near, so a swipe never lands on a paused card
-  const onScreen = new Set();
-  let near = false;
-  const syncFilms = () => {
-    const live = document.visibilityState === "visible";
-    films.forEach((v) => {
-      const want = live && (filmSwipe.matches ? near : onScreen.has(v));
+let rowFrames = frames;                     // on phones: clones + originals + clones
+let near = false;
+const onScreen = new Set();
+const syncFilms = () => {
+  if (reduced) return;
+  const live = document.visibilityState === "visible";
+  if (filmSwipe.matches) {
+    // only the cards actually in view play, wherever they are in the endless row
+    rowFrames.forEach((f) => {
+      const v = f.querySelector("video");
+      const want = live && near && parseFloat(f.style.getPropertyValue("--k") || 0) > 0.02;
       if (want && v.paused) v.play().catch(() => {});
       else if (!want && !v.paused) v.pause();
     });
-  };
+  } else {
+    films.forEach((v) => {
+      const want = live && onScreen.has(v);
+      if (want && v.paused) v.play().catch(() => {});
+      else if (!want && !v.paused) v.pause();
+    });
+  }
+};
+if (films.length && "IntersectionObserver" in window) {
   const fio = new IntersectionObserver((entries) => {
     for (const e of entries) e.isIntersecting ? onScreen.add(e.target) : onScreen.delete(e.target);
     syncFilms();
   }, { threshold: 0.2 });
   films.forEach((v) => fio.observe(v));
-  if (filmSection) {
-    new IntersectionObserver(([e]) => { near = e.isIntersecting; syncFilms(); }, { rootMargin: "20% 0px" }).observe(filmSection);
-  }
-  filmSwipe.addEventListener("change", syncFilms);
+  if (filmSection) new IntersectionObserver(([e]) => { near = e.isIntersecting; syncFilms(); }, { rootMargin: "20% 0px" }).observe(filmSection);
   document.addEventListener("visibilitychange", syncFilms);
 }
 
-// phone row: --k is 1 for the centred postcard and falls to 0 one card away
 if (filmRow && frames.length) {
+  let clones = [];
+  const makeClone = (f) => {
+    const c = f.cloneNode(true);
+    c.classList.add("clone"); c.setAttribute("aria-hidden", "true");
+    c.querySelector("video")?.setAttribute("preload", "none");
+    return c;
+  };
+  const build = () => {
+    clones.forEach((c) => c.remove()); clones = [];
+    if (filmSwipe.matches) {
+      const before = frames.map(makeClone), after = frames.map(makeClone);
+      before.forEach((c) => filmRow.insertBefore(c, frames[0]));
+      after.forEach((c) => filmRow.appendChild(c));
+      clones = [...before, ...after];
+      rowFrames = [...before, ...frames, ...after];
+    } else rowFrames = frames;
+  };
   let fq = false;
+  // --k is 1 for the centred postcard and falls to 0 one card away
   const centre = () => {
     fq = false;
     if (!filmSwipe.matches) { frames.forEach((f) => { f.style.removeProperty("--k"); f.classList.remove("on"); }); return; }
     const mid = filmRow.scrollLeft + filmRow.clientWidth / 2;
-    const step = frames[1] ? frames[1].offsetLeft - frames[0].offsetLeft : frames[0].offsetWidth;
-    frames.forEach((f) => {
+    const step = rowFrames[1].offsetLeft - rowFrames[0].offsetLeft;
+    rowFrames.forEach((f) => {
       const c = f.offsetLeft - filmRow.offsetLeft + f.offsetWidth / 2;
       const k = clamp(1 - Math.abs(c - mid) / step, 0, 1);
       f.style.setProperty("--k", k.toFixed(3));
       f.classList.toggle("on", k > 0.5);
     });
+    syncFilms();
   };
   const queueCentre = () => { if (!fq) { fq = true; requestAnimationFrame(centre); } };
-  const snapTo = (f, smooth) => {
-    const left = f.offsetLeft - filmRow.offsetLeft + f.offsetWidth / 2 - filmRow.clientWidth / 2;
-    filmRow.scrollTo({ left, behavior: smooth && !reduced ? "smooth" : "instant" });
+  const leftFor = (f) => f.offsetLeft - filmRow.offsetLeft + f.offsetWidth / 2 - filmRow.clientWidth / 2;
+  const snapTo = (f, smooth) => filmRow.scrollTo({ left: leftFor(f), behavior: smooth && !reduced ? "smooth" : "instant" });
+  // when a swipe settles on a copy, hop to the matching original; same picture, so the jump is invisible
+  let settle = 0;
+  const wrap = () => {
+    if (!filmSwipe.matches) return;
+    const n = frames.length;
+    const mid = filmRow.scrollLeft + filmRow.clientWidth / 2;
+    let best = 0, bd = Infinity;
+    rowFrames.forEach((f, i) => { const d = Math.abs(f.offsetLeft - filmRow.offsetLeft + f.offsetWidth / 2 - mid); if (d < bd) { bd = d; best = i; } });
+    if (best >= n && best < 2 * n) return;
+    const target = rowFrames[n + (best % n)], from = rowFrames[best];
+    const tv = target.querySelector("video"), fv = from.querySelector("video");
+    if (tv && fv && fv.readyState > 1) { try { tv.currentTime = fv.currentTime; } catch {} }
+    const snap = filmRow.style.scrollSnapType;
+    filmRow.style.scrollSnapType = "none";
+    filmRow.scrollLeft += leftFor(target) - leftFor(from);
+    filmRow.style.scrollSnapType = snap;
+    queueCentre();
   };
-  // open on the middle card so both neighbours peek in
-  const openMiddle = () => { if (filmSwipe.matches && frames[1]) snapTo(frames[1], false); queueCentre(); };
-  openMiddle();
-  filmSwipe.addEventListener("change", openMiddle);
-  filmRow.addEventListener("scroll", queueCentre, { passive: true });
+  const open = () => { build(); if (filmSwipe.matches) snapTo(frames[1] || frames[0], false); queueCentre(); };
+  open();
+  filmSwipe.addEventListener("change", open);
+  filmRow.addEventListener("scroll", () => { queueCentre(); clearTimeout(settle); settle = setTimeout(wrap, 140); }, { passive: true });
+  if ("onscrollend" in window) filmRow.addEventListener("scrollend", wrap);
   addEventListener("resize", queueCentre, { passive: true });
   // a tap on a peeking card brings it to the middle
-  frames.forEach((f) => f.addEventListener("click", () => { if (filmSwipe.matches && !f.classList.contains("on")) snapTo(f, true); }));
+  filmRow.addEventListener("click", (e) => {
+    const f = e.target.closest(".frame");
+    if (f && filmSwipe.matches && !f.classList.contains("on")) snapTo(f, true);
+  });
 }
 
 // ---------- one rAF scroll loop: hero drift, deck stacking, art parallax, nav state ----------

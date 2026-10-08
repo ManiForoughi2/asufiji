@@ -5,10 +5,10 @@
 @media (max-width: 760px), (hover: none) and (pointer: coarse) {
   /* reveals: blur on dozens of text spans means a fresh offscreen blur pass per element per frame
      for ~1s, right while the finger is scrolling. keep the rise and the fade, drop the blur */
+  /* on phones everything shows the moment the page loads: no fade-ins, no rising words */
   .motion .reveal,
   .motion .kinetic .w {
-    filter: none;
-    transition-property: opacity, transform;
+    opacity: 1; transform: none; filter: none; transition: none;
   }
 
   /* nav bar: backdrop blur re-samples everything that scrolls (and the live sea) under a
@@ -20,9 +20,9 @@
   }
   html .rail::before { background: var(--bg); }
 
-  /* the webgl sea covers the whole hero once it's running; the css sky (and its overlay-blended
-     grain) under it is never seen but still composited */
-  .hero.gl-sea .sky { visibility: hidden; }
+  /* keep the css sky under the webgl canvas as a backstop: if the canvas is ever cleared (a
+     resize mid-scroll), the sky shows instead of the bare page color. drop only its grain */
+  .hero.gl-sea .sky::after { display: none; }
   /* no-webgl fallback: the animated displacement ripple is the costliest filter on the page */
   .word-refl { filter: none; }
 

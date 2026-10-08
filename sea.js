@@ -216,7 +216,7 @@ const LEVELS = [{ q: 1, ms: 1000 / 60 }, { q: 1, ms: 1000 / 30 }, { q: 0.85, ms:
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 
 // phones and tablets: weaker gpus that also have to composite a touch scroll. same scene, fewer
-// pixels, 30fps, 3 cloud octaves, and no rendering mid-scroll or once the hero is mostly gone
+// pixels, 30fps and 3 cloud octaves; it keeps moving while you scroll
 const TOUCH = matchMedia("(hover: none) and (pointer: coarse)");
 
 export function startSea(canvas, opts) {
@@ -386,8 +386,6 @@ export function startSea(canvas, opts) {
     raf = requestAnimationFrame(loop);
     const iv = LEVELS[level].ms, el = now - last;
     if (el < iv * 0.75) return;
-    // touch: hold the last frame while the finger scrolls; the gpu goes to the compositor
-    if (touch && now - scrollT < 180) { last = 0; return; }
     // watch real pacing: two windows of 30 frames well over budget means the gpu can't keep up
     if (last && el < 250) {
       acc += el;
@@ -416,18 +414,15 @@ export function startSea(canvas, opts) {
   (document.fonts?.ready || Promise.resolve()).then(() => { size(); draw(3.0); });
   const resized = () => { if (!lost) { size(); draw(performance.now() / 1000 * 0.55); } };
   let rt = 0;
-  new ResizeObserver(() => {
-    if (!touch) return resized();
-    // the url bar showing/hiding nudges the height; a stretched frame beats a texture rebuild mid-scroll
-    if (canvas.clientWidth === cw && Math.abs(canvas.clientHeight - ch) < 160) return;
-    clearTimeout(rt); rt = setTimeout(resized, 150);
-  }).observe(canvas);
-  if (touch) addEventListener("scroll", () => { scrollT = performance.now(); }, { passive: true });
+  // resizing clears the canvas, so always redraw in the same frame (the phone url bar resizes
+  // the page while you scroll; skipping this left a stretched or blank sky)
+  new ResizeObserver(resized).observe(canvas);
   if ("IntersectionObserver" in window) {
     new IntersectionObserver(([e]) => {
-      visible = touch ? e.intersectionRatio >= 0.35 : e.isIntersecting;
+      visible = e.isIntersecting;
+      if (visible && !lost) draw(performance.now() / 1000 * 0.55);
       run(visible);
-    }, { threshold: touch ? [0, 0.35] : 0 }).observe(canvas);
+    }, { threshold: 0 }).observe(canvas);
   }
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); lost = true; run(false); });
   canvas.addEventListener("webglcontextrestored", () => {
