@@ -8,14 +8,24 @@
 <meta name="theme-color" content="#0d1322">
 <meta property="og:title" content="Internships | FIJI at Arizona State">
 <meta property="og:description" content="Where FIJI brothers at Arizona State interned in summer 2026.">
-<meta property="og:url" content="https://asufiji.com/">
+<link rel="canonical" href="https://asufiji.com/internships.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FIJI at Arizona State">
+<meta property="og:url" content="https://asufiji.com/internships.html">
+<meta property="og:image" content="https://asufiji.com/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FIJI, standing on the water at night">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://asufiji.com/assets/og.jpg">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/recia-600.woff2" as="font" type="font/woff2" crossorigin>
 <script>
   (function () {
     var d = document.documentElement, t = null;
-    t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    try { t = localStorage.getItem("asufiji-theme"); } catch (e) {}
+    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     d.setAttribute("data-theme", t);
   })();
 </script>
@@ -60,6 +70,9 @@
   <a class="btn-brass btn-sm magnetic" href="join.html">Join</a>
   <button class="rail-menu" type="button" aria-expanded="false" aria-controls="rail-links">Menu</button>
 </nav>
+<button class="theme-toggle" type="button" aria-label="Switch to day" title="Day / night">
+  <svg aria-hidden="true"><use href="#i-palm"/></svg>
+</button>
 
 <header class="hero hero-sub" style="--ratio:7.26">
   <h1 class="sr-only">Internships</h1>
@@ -75,25 +88,31 @@
 </header>
 
 <main class="page-body">
-  <p class="board-count reveal"><span>23</span> companies took a FIJI brother last summer.</p>
-  <div class="board reveal">
-    <section class="board-col">
-      <h2 class="board-head">Finance and real estate</h2>
-      <ul class="board-list"><li>J.P. Morgan</li><li>Wells Fargo</li><li>Deloitte</li><li>Credit Sesame</li><li>Renaissance Financial</li><li>Matthews Real Estate</li></ul>
-    </section>
-    <section class="board-col">
-      <h2 class="board-head">Tech and engineering</h2>
-      <ul class="board-list"><li>Microsoft</li><li>Amazon</li><li>Texas Instruments</li><li>Curtiss-Wright</li><li>Vivint</li><li>NRG</li><li>CallPoint</li><li>HemaSense</li></ul>
-    </section>
-    <section class="board-col">
-      <h2 class="board-head">Construction</h2>
-      <ul class="board-list"><li>Rytan Construction</li><li>Coakley Williams Construction</li><li>JT Magen</li><li>Solano Builders</li><li>Aqualis Partners</li></ul>
-    </section>
-    <section class="board-col">
-      <h2 class="board-head">Sports, media and travel</h2>
-      <ul class="board-list"><li>Arizona Diamondbacks</li><li>Phoenix Rising FC</li><li>Cartoon Network</li><li>Elysium Private Jet</li></ul>
-    </section>
-  </div>
+  <ul class="logo-wall reveal" aria-label="Companies where brothers interned">
+    <li class="logo"><span class="logo-mark" role="img" aria-label="J.P. Morgan" title="J.P. Morgan" style="--src:url(assets/logos/jpmorgan.svg);width:13.77em;height:2.83em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Wells Fargo" title="Wells Fargo" style="--src:url(assets/logos/wells-fargo.svg);width:6.18em;height:6.31em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Deloitte" title="Deloitte" style="--src:url(assets/logos/deloitte.svg);width:14.36em;height:2.71em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Credit Sesame" title="Credit Sesame" style="--src:url(assets/logos/credit-sesame.svg);width:8.09em;height:4.82em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Renaissance Financial" title="Renaissance Financial" style="--src:url(assets/logos/renaissance-financial.png);width:10.51em;height:3.71em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Matthews" title="Matthews" style="--src:url(assets/logos/matthews.svg);width:19.26em;height:2.03em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Microsoft" title="Microsoft" style="--src:url(assets/logos/microsoft.svg);width:13.51em;height:2.89em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Amazon" title="Amazon" style="--src:url(assets/logos/amazon.svg);width:11.36em;height:3.43em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Texas Instruments" title="Texas Instruments" style="--src:url(assets/logos/texas-instruments.svg);width:12.90em;height:3.03em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Curtiss-Wright" title="Curtiss-Wright" style="--src:url(assets/logos/curtiss-wright.svg);width:11.84em;height:3.29em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Vivint" title="Vivint" style="--src:url(assets/logos/vivint.svg);width:12.79em;height:3.05em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="NRG" title="NRG" style="--src:url(assets/logos/nrg.svg);width:7.61em;height:5.13em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="CallPoint" title="CallPoint" style="--src:url(assets/logos/callpoint.png);width:12.18em;height:3.20em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="HemaSense" title="HemaSense" style="--src:url(assets/logos/hemasense.png);width:14.69em;height:2.66em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Rytan Construction" title="Rytan Construction" style="--src:url(assets/logos/rytan-construction.png);width:10.55em;height:3.70em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Coakley Williams Construction" title="Coakley Williams Construction" style="--src:url(assets/logos/coakley-williams-construction.png);width:9.80em;height:3.98em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="JT Magen" title="JT Magen" style="--src:url(assets/logos/jt-magen.png);width:5.95em;height:6.55em"></span></li>
+    <li class="logo logo-text"><span>Solano Builders</span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Aqualis Partners" title="Aqualis Partners" style="--src:url(assets/logos/aqualis-partners.png);width:13.68em;height:2.85em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Arizona Diamondbacks" title="Arizona Diamondbacks" style="--src:url(assets/logos/arizona-diamondbacks.svg);width:6.73em;height:5.80em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Phoenix Rising FC" title="Phoenix Rising FC" style="--src:url(assets/logos/phoenix-rising-fc.png);width:3.98em;height:7.40em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Cartoon Network" title="Cartoon Network" style="--src:url(assets/logos/cartoon-network.svg);width:11.96em;height:3.26em"></span></li>
+    <li class="logo"><span class="logo-mark" role="img" aria-label="Elysium Private Jet" title="Elysium Private Jet" style="--src:url(assets/logos/elysium-private-jet.svg);width:6.31em;height:6.18em"></span></li>
+  </ul>
 </main>
 
 <footer class="foot">

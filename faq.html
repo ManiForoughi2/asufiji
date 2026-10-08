@@ -8,14 +8,24 @@
 <meta name="theme-color" content="#0d1322">
 <meta property="og:title" content="FAQ | FIJI at Arizona State">
 <meta property="og:description" content="Questions guys ask before rushing FIJI at Arizona State.">
-<meta property="og:url" content="https://asufiji.com/">
+<link rel="canonical" href="https://asufiji.com/faq.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FIJI at Arizona State">
+<meta property="og:url" content="https://asufiji.com/faq.html">
+<meta property="og:image" content="https://asufiji.com/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FIJI, standing on the water at night">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://asufiji.com/assets/og.jpg">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/recia-600.woff2" as="font" type="font/woff2" crossorigin>
 <script>
   (function () {
     var d = document.documentElement, t = null;
-    t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    try { t = localStorage.getItem("asufiji-theme"); } catch (e) {}
+    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     d.setAttribute("data-theme", t);
   })();
 </script>
@@ -60,6 +70,9 @@
   <a class="btn-brass btn-sm magnetic" href="join.html">Join</a>
   <button class="rail-menu" type="button" aria-expanded="false" aria-controls="rail-links">Menu</button>
 </nav>
+<button class="theme-toggle" type="button" aria-label="Switch to day" title="Day / night">
+  <svg aria-hidden="true"><use href="#i-palm"/></svg>
+</button>
 
 <header class="hero hero-sub" style="--ratio:2.23">
   <h1 class="sr-only">Frequently asked questions</h1>
@@ -82,7 +95,7 @@
     </details>
     <details class="qa reveal">
       <summary><span>When is rush?</span><svg class="qa-mark" aria-hidden="true"><use href="#i-down"/></svg></summary>
-      <p>Every fall and spring. It starts with two open nights at GLV, then Dye Day, then two invite-only nights. Fill out the rush form so we can send you the dates.</p>
+      <p>Every fall and spring. The schedule changes each semester, so fill out the rush form and we&#39;ll send you the dates.</p>
     </details>
     <details class="qa reveal">
       <summary><span>Where is GLV?</span><svg class="qa-mark" aria-hidden="true"><use href="#i-down"/></svg></summary>
@@ -95,14 +108,6 @@
     <details class="qa reveal">
       <summary><span>How much does it cost?</span><svg class="qa-mark" aria-hidden="true"><use href="#i-down"/></svg></summary>
       <p>Dues change from year to year, so ask the rush chairs for this semester's number. They'll give you a straight answer.</p>
-    </details>
-    <details class="qa reveal">
-      <summary><span>Is there a GPA requirement?</span><svg class="qa-mark" aria-hidden="true"><use href="#i-down"/></svg></summary>
-      <p>Yes. ASU sets a minimum GPA to join any fraternity. The rush chairs can tell you this semester's number.</p>
-    </details>
-    <details class="qa reveal">
-      <summary><span>How do bids work?</span><svg class="qa-mark" aria-hidden="true"><use href="#i-down"/></svg></summary>
-      <p>Come out during the week and get to know the guys. Bids go out after the invite-only nights.</p>
     </details>
     <details class="qa reveal">
       <summary><span>Who do I talk to?</span><svg class="qa-mark" aria-hidden="true"><use href="#i-down"/></svg></summary>

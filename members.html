@@ -8,14 +8,24 @@
 <meta name="theme-color" content="#0d1322">
 <meta property="og:title" content="Members | FIJI at Arizona State">
 <meta property="og:description" content="Brothers only.">
-<meta property="og:url" content="https://asufiji.com/">
+<link rel="canonical" href="https://asufiji.com/members.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FIJI at Arizona State">
+<meta property="og:url" content="https://asufiji.com/members.html">
+<meta property="og:image" content="https://asufiji.com/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FIJI, standing on the water at night">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://asufiji.com/assets/og.jpg">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/recia-600.woff2" as="font" type="font/woff2" crossorigin>
 <script>
   (function () {
     var d = document.documentElement, t = null;
-    t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    try { t = localStorage.getItem("asufiji-theme"); } catch (e) {}
+    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     d.setAttribute("data-theme", t);
   })();
 </script>
@@ -60,6 +70,9 @@
   <a class="btn-brass btn-sm magnetic" href="join.html">Join</a>
   <button class="rail-menu" type="button" aria-expanded="false" aria-controls="rail-links">Menu</button>
 </nav>
+<button class="theme-toggle" type="button" aria-label="Switch to day" title="Day / night">
+  <svg aria-hidden="true"><use href="#i-palm"/></svg>
+</button>
 
 <header class="hero hero-sub" style="--ratio:5.37">
   <h1 class="sr-only">Members</h1>
@@ -70,21 +83,20 @@
     <span class="word word-refl">MEMBERS</span>
   </div>
   <div class="hero-base">
-    <p class="tagline">Brothers only. Sign-in is on the way.</p>
+    <p class="tagline">Brothers only.</p>
   </div>
 </header>
 
 <main class="page-body">
-  <section class="soon reveal">
-    <h2 class="soon-head">Sign-in is coming soon.</h2>
-    <p class="soon-text">Brothers will log in here with their email to get everything below in one place.</p>
-  </section>
-  <ul class="soon-list reveal" aria-label="Coming to the members area">
-    <li><span class="soon-item">Chapter calendar</span><span class="soon-note">Every event, synced to your phone</span></li>
-    <li><span class="soon-item">Pledge study</span><span class="soon-note">Pin order, cards and the chapter test</span></li>
-    <li><span class="soon-item">Chapter files</span><span class="soon-note">Bylaws, minutes and forms</span></li>
-    <li><span class="soon-item">Dues</span><span class="soon-note">What you owe and when</span></li>
-  </ul>
+  <form class="login reveal" novalidate data-msg="Member accounts open soon. Check back then.">
+    <h2 class="login-head">Member sign-in</h2>
+    <label class="login-label" for="user">Username</label>
+    <input class="login-input" id="user" name="user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <label class="login-label" for="pw">Password</label>
+    <input class="login-input" id="pw" name="pw" type="password" autocomplete="current-password">
+    <button class="btn-brass login-btn" type="submit">Sign in</button>
+    <p class="login-msg" role="status" aria-live="polite"></p>
+  </form>
 </main>
 
 <footer class="foot">

@@ -1,5 +1,4 @@
 import { mountShader, prefersReducedMotion } from "./shaders.js";
-import { SFX } from "./sfx.js";
 import { startSea } from "./sea.js";
 
 const root = document.documentElement;
@@ -61,14 +60,25 @@ if (reduced) document.querySelector("svg")?.pauseAnimations?.();
 // ---------- theme follows the device setting ----------
 const themeMeta = document.querySelector('meta[name="theme-color"]');
 const scheme = matchMedia("(prefers-color-scheme: light)");
-function syncTheme() {
-  const t = scheme.matches ? "light" : "dark";
+function applyTheme(t) {
   root.setAttribute("data-theme", t);
   if (themeMeta) themeMeta.content = PAL[t].bg;
+  const btn = document.querySelector(".theme-toggle");
+  btn?.setAttribute("aria-label", t === "dark" ? "Switch to day" : "Switch to night");
   retint();
   sea?.redraw();
 }
-scheme.addEventListener?.("change", syncTheme);
+function savedTheme() {
+  try { const t = localStorage.getItem("asufiji-theme"); return t === "light" || t === "dark" ? t : null; } catch { return null; }
+}
+// the device setting wins until someone picks a theme with the switch
+scheme.addEventListener?.("change", () => { if (!savedTheme()) applyTheme(scheme.matches ? "light" : "dark"); });
+document.querySelector(".theme-toggle")?.addEventListener("click", () => {
+  const next = theme() === "dark" ? "light" : "dark";
+  try { localStorage.setItem("asufiji-theme", next); } catch {}
+  applyTheme(next);
+});
+document.querySelector(".theme-toggle")?.setAttribute("aria-label", theme() === "dark" ? "Switch to day" : "Switch to night");
 if (themeMeta) themeMeta.content = PAL[theme()].bg;
 
 // ---------- kinetic type + scroll reveals ----------
@@ -150,6 +160,31 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") liveVid?.play().catch(() => {});
 });
 
+// ---------- sign-in shells: accounts aren't live yet, so say so on submit ----------
+document.querySelectorAll("form.login").forEach((form) => {
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    form.querySelector(".login-msg").textContent = form.dataset.msg || "Sign-in opens soon.";
+  });
+});
+
+// ---------- film postcards: play while on screen ----------
+const films = [...document.querySelectorAll(".frame video")];
+const frames = [...document.querySelectorAll(".frame")];
+if (films.length && !reduced && "IntersectionObserver" in window) {
+  const onScreen = new Set();
+  const fio = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) { onScreen.add(e.target); e.target.play().catch(() => {}); }
+      else { onScreen.delete(e.target); e.target.pause(); }
+    }
+  }, { threshold: 0.2 });
+  films.forEach((v) => fio.observe(v));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") onScreen.forEach((v) => v.play().catch(() => {}));
+  });
+}
+
 // ---------- one rAF scroll loop: hero drift, deck stacking, art parallax, nav state ----------
 const hero = document.querySelector(".hero");
 const cards = [...document.querySelectorAll(".card")];
@@ -209,6 +244,15 @@ function frame() {
     }
   }
 
+  if (!reduced) {
+    frames.forEach((f, i) => {
+      const r = f.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > vh) return;
+      const off = (r.top + r.height / 2 - vh / 2) / vh;
+      f.style.setProperty("--py", (off * (i === 1 ? -60 : -24)).toFixed(2) + "px");
+    });
+  }
+
   if (compass && !reduced) {
     const r = compass.getBoundingClientRect();
     if (r.bottom > 0 && r.top < vh) compass.style.setProperty("--rot", ((r.top + r.height / 2 - vh / 2) * -0.08).toFixed(2) + "deg");
@@ -244,19 +288,3 @@ if (!reduced && finePointer) {
     });
   });
 }
-
-// ---------- sound: soft synthesized ticks, M toggles (persisted) ----------
-document.addEventListener("click", (e) => {
-  const t = e.target.closest("a, button");
-  if (!t) return;
-  if (t.classList.contains("btn-brass")) SFX.click();
-  else SFX.tick();
-});
-let armed = false; // no audio before the first gesture, or the browser logs autoplay warnings
-document.addEventListener("pointerdown", () => { armed = true; }, { once: true, passive: true });
-navLinks.forEach((a) => a.addEventListener("pointerenter", () => { if (armed) SFX.tick(); }));
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "m" && e.key !== "M") return;
-  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.("input, textarea, [contenteditable]")) return;
-  SFX.toggle();
-});

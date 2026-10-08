@@ -8,14 +8,24 @@
 <meta name="theme-color" content="#0d1322">
 <meta property="og:title" content="Join FIJI at Arizona State">
 <meta property="og:description" content="Rush FIJI at ASU: the rush week schedule and the interest form.">
-<meta property="og:url" content="https://asufiji.com/">
+<link rel="canonical" href="https://asufiji.com/join.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FIJI at Arizona State">
+<meta property="og:url" content="https://asufiji.com/join.html">
+<meta property="og:image" content="https://asufiji.com/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="FIJI, standing on the water at night">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://asufiji.com/assets/og.jpg">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/recia-600.woff2" as="font" type="font/woff2" crossorigin>
 <script>
   (function () {
     var d = document.documentElement, t = null;
-    t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    try { t = localStorage.getItem("asufiji-theme"); } catch (e) {}
+    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     d.setAttribute("data-theme", t);
   })();
 </script>
@@ -60,6 +70,9 @@
   <a class="btn-brass btn-sm magnetic" href="join.html" aria-current="page">Join</a>
   <button class="rail-menu" type="button" aria-expanded="false" aria-controls="rail-links">Menu</button>
 </nav>
+<button class="theme-toggle" type="button" aria-label="Switch to day" title="Day / night">
+  <svg aria-hidden="true"><use href="#i-palm"/></svg>
+</button>
 
 <header class="hero hero-sub" style="--ratio:2.42">
   <h1 class="sr-only">Join FIJI at Arizona State</h1>
@@ -81,7 +94,7 @@
     <div class="it-head">
       <svg class="it-palm" aria-hidden="true"><use href="#i-palm"/></svg>
       <p class="it-fiji">FIJI</p>
-      <p class="it-label">Rush Week</p>
+      <p class="it-label">Fall &#39;26 Rush Week</p>
     </div>
     <ol class="it-rows">
       <li class="it-row"><span class="it-day">Monday</span><span class="it-what">Open night</span><span class="it-where">GLV</span></li>

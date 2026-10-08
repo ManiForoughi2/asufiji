@@ -1,0 +1,209 @@
+[
+  {
+    "name": "J.P. Morgan",
+    "file": "assets/logos/jpmorgan.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:J_P_Morgan_Logo_2008.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 4.8626,
+    "notes": "Official J.P. Morgan wordmark (black). Matches graphic."
+  },
+  {
+    "name": "Wells Fargo",
+    "file": "assets/logos/wells-fargo.svg",
+    "source_url": "https://cdn.simpleicons.org/wellsfargo",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 0.98,
+    "notes": "Simple Icons single-colour version of the 2020 logo: square box with WELLS FARGO knocked out (letters are transparent holes), so it stays legible under a CSS mask. The full-colour red/white box (Commons) is saved as wells-fargo-color.svg but flattens to a solid square."
+  },
+  {
+    "name": "Deloitte",
+    "file": "assets/logos/deloitte.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Logo_of_Deloitte.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 5.2812,
+    "notes": "Black wordmark with green dot; dot becomes same colour when flattened (fine)."
+  },
+  {
+    "name": "Credit Sesame",
+    "file": "assets/logos/credit-sesame.svg",
+    "source_url": "https://www.creditsesame.com/wp-content/uploads/2022/11/logo.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 1.6793,
+    "notes": "From creditsesame.com header. Graphic shows it as white text in a blue circle; this is the plain wordmark, which is better for a mask."
+  },
+  {
+    "name": "Renaissance Financial",
+    "file": "assets/logos/renaissance-financial.png",
+    "source_url": "https://static.fmgsuite.com/media/TransparentLogo/variantSize/cfd90c9f-0c37-4466-a1ac-597780e0b09f.png",
+    "format": "png",
+    "kind": "wordmark",
+    "aspect": 2.8305,
+    "notes": "From renaissancefinancial.com header (Phoenix office at 3131 E Camelback; recruits at ASU). Seal + wordmark, transparent PNG but only ~338px wide (largest the site serves). Seal detail is fine-grained; legible at >=150px wide. Graphic shows the name in caps serif; the site uses a slab-serif wordmark with the same seal."
+  },
+  {
+    "name": "Matthews Real Estate Investment Services",
+    "file": "assets/logos/matthews.svg",
+    "source_url": "https://cms.matthews.com/wp-content/uploads/2025/08/brand-logo.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 9.5143,
+    "notes": "Current (2025 rebrand) MATTHEWS(TM) wordmark from matthews.com header, served in white. Graphic shows older lockup with 'REAL ESTATE INVESTMENT SERVICES' tagline, which the site no longer serves."
+  },
+  {
+    "name": "Microsoft",
+    "file": "assets/logos/microsoft.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Microsoft_logo_(2012).svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 4.6838,
+    "notes": "Four-square logo + wordmark. Squares merge into one colour but gaps keep the 2x2 grid readable."
+  },
+  {
+    "name": "Amazon",
+    "file": "assets/logos/amazon.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Amazon_logo.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 3.3113,
+    "notes": "Wordmark with smile arrow."
+  },
+  {
+    "name": "Texas Instruments",
+    "file": "assets/logos/texas-instruments.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Texas_Instruments_logo_2024.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 4.2644,
+    "notes": "Texas-shaped 'ti' mark + TEXAS INSTRUMENTS. Matches graphic."
+  },
+  {
+    "name": "Curtiss-Wright",
+    "file": "assets/logos/curtiss-wright.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Curtiss-Wright_logo.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 3.5935,
+    "notes": "Red italic CURTISS-WRIGHT wordmark. Matches graphic."
+  },
+  {
+    "name": "Vivint",
+    "file": "assets/logos/vivint.svg",
+    "source_url": "https://www.vivint.com/ (inline header SVG, svg.vivint-logo; path copied verbatim, SHA-256 verified)",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 4.1929,
+    "notes": "Current 2025 Vivint logo (house mark now at the right). Graphic shows the older layout with the house at the left; that version only exists as a 252px PNG on Commons (File:Vivint-logo-black.png), too small, so the current official SVG was used."
+  },
+  {
+    "name": "NRG Energy",
+    "file": "assets/logos/nrg.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:NRG_Energy_logo.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 1.4824,
+    "notes": "nrg wordmark + multicolour pixel cross; cross reads fine in one colour."
+  },
+  {
+    "name": "CallPoint",
+    "file": "assets/logos/callpoint.png",
+    "source_url": "https://cdn.prod.website-files.com/5fc9453a7272403c9cd19a1e/6a0b425514b8b4792af35e5c_NewHome_CPLogo_vertical50.webp",
+    "format": "png",
+    "kind": "wordmark",
+    "aspect": 3.8,
+    "notes": "CallPoint USA (Phoenix call-centre for home-service trades), callpointusa.com; matches graphic (wifi arcs over the i). LOW-RES: the site only serves this 190x50 webp (converted to PNG, white on transparent). Will look soft above ~190px wide / on retina; ask the company or a brother for a vector if possible."
+  },
+  {
+    "name": "HemaSense",
+    "file": "assets/logos/hemasense.png",
+    "source_url": "https://www.hemasense.com/images/brand/hemasense-logo.png",
+    "format": "png",
+    "kind": "wordmark",
+    "aspect": 5.5333,
+    "notes": "Phoenix med-device startup (AZBio member). Matches graphic. 480px wide transparent PNG; mark-only also at https://www.hemasense.com/images/brand/mark.png."
+  },
+  {
+    "name": "Rytan Construction",
+    "file": "assets/logos/rytan-construction.png",
+    "source_url": "https://rytanconstruction.com/wp-content/uploads/2022/10/cropped-RYTAN-final-logo-horiz-red-1-copy.png",
+    "format": "png",
+    "kind": "wordmark",
+    "aspect": 2.8537,
+    "notes": "Phoenix GC (rytanconstruction.com, not rytan.com which is a hardware store). 708px transparent PNG. Shield mark has a knocked-out R so it stays legible in one colour."
+  },
+  {
+    "name": "Coakley Williams Construction",
+    "file": "assets/logos/coakley-williams-construction.png",
+    "source_url": "https://images.squarespace-cdn.com/content/v1/5391048de4b02f5a66f80c29/4d504c5e-b79f-42f2-9559-fa7d34dd745c/White+Logo-Orange-Tagline-Transparent-Background.png",
+    "format": "png",
+    "kind": "wordmark",
+    "aspect": 2.46,
+    "notes": "From coakleywilliams.com (white on transparent, served as webp, converted). The site file includes an orange 'BUILDING THE DMV' tagline under the lockup; it was cropped off (no redrawing) to match the graphic's three-line lockup. Original with tagline: coakley-williams-construction-tagline.png."
+  },
+  {
+    "name": "JT Magen",
+    "file": "assets/logos/jt-magen.png",
+    "source_url": "https://jtmagen.com/wp-content/themes/jt-magen/assets/img/logo-large.png",
+    "format": "png",
+    "kind": "wordmark",
+    "aspect": 0.9085,
+    "notes": "Outline M mark with green diagonal + JTMAGEN. 536px transparent PNG. Thin hairlines: keep it >=120px tall."
+  },
+  {
+    "name": "Solano Builders LLC",
+    "file": null,
+    "source_url": "https://solanobuildersllc.com/",
+    "format": null,
+    "kind": "wordmark",
+    "aspect": null,
+    "notes": "NOT FOUND. solanobuildersllc.com is a text-only GoDaddy page with no logo image; solanobuilders.com is a different company (Solano Homes). No genuine source for the 'SB house' logo in the graphic was found. Get the file from the brother who interned there or the company's social media."
+  },
+  {
+    "name": "Aqualis Partners",
+    "file": "assets/logos/aqualis-partners.png",
+    "source_url": "https://www.aqualispartners.com/ (white logo embedded as base64 PNG in app.js)",
+    "format": "png",
+    "kind": "wordmark",
+    "aspect": 4.8,
+    "notes": "Private-equity secondaries firm (Darien CT, founded 2025). White 600x125 transparent PNG extracted from the site bundle. Current site logo is lowercase 'aqualis' with waves at left; graphic shows an uppercase AQUALIS / PARTNERS lockup with waves at right (likely an earlier logo, not served anywhere found)."
+  },
+  {
+    "name": "Arizona Diamondbacks",
+    "file": "assets/logos/arizona-diamondbacks.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Arizona_Diamondbacks_logo_teal.svg",
+    "format": "svg",
+    "kind": "mark",
+    "aspect": 1.1617,
+    "notes": "Primary 'A' logo (teal/Sedona red, as in graphic and on Wikipedia). Flattened as-is it is a solid A blob, so the shipped file is a single-colour knockout derived from the official paths (teal outline/details made transparent via an SVG mask; no shapes drawn). Original colour file: arizona-diamondbacks-color.svg."
+  },
+  {
+    "name": "Phoenix Rising FC",
+    "file": "assets/logos/phoenix-rising-fc.png",
+    "source_url": "https://www.phxrisingfc.com/wp-content/uploads/sites/29/2025/08/cropped-Primary-Logo.png",
+    "format": "png",
+    "kind": "mark",
+    "aspect": 0.5373,
+    "notes": "Primary crest (with 2023 champions star) from phxrisingfc.com, 1533x1920. Colour crest is a black shield and flattens to a solid blob, so the shipped file is a knockout derived from the official PNG (dark shield pixels made transparent by luminance; phoenix, ball, text and border stay). Original: phoenix-rising-fc-color.png."
+  },
+  {
+    "name": "Cartoon Network",
+    "file": "assets/logos/cartoon-network.svg",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Cartoon_Network_1992-2004.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 3.663,
+    "notes": "Classic checkerboard logo (as in graphic). Shipped file is a single-colour knockout derived from the official paths via SVG mask (white areas transparent), so the checkerboard survives the CSS mask. Original: cartoon-network-color.svg. Note: CN's current logo is the 2010 'CN' mark; the graphic uses the classic one."
+  },
+  {
+    "name": "Elysium Private Jet",
+    "file": "assets/logos/elysium-private-jet.svg",
+    "source_url": "https://elysiumjet.com/wp-content/uploads/2024/10/logo-white.svg",
+    "format": "svg",
+    "kind": "wordmark",
+    "aspect": 1.0194,
+    "notes": "From elysiumjet.com header (white SVG): compass/jet emblem + Elysium PRIVATE JET. Matches graphic exactly."
+  }
+]

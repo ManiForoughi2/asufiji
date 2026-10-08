@@ -42,6 +42,9 @@ uniform sampler2D uWord;  // word alpha for the area above the horizon; bottom r
 uniform vec2 uWordRes;
 uniform float uPh[12];    // per-wave phase at uTime, wrapped on the cpu
 uniform vec3 uSkyTop, uSkyMid, uHaze, uGlow, uBody, uDeep, uGlint, uWordCol;
+uniform vec3 uIsle, uIsleFar, uCloud;   // island silhouettes and cloud tint
+uniform float uClouds;                  // cloud amount
+// scene texture (premultiplied): r = wordmark, g = near island, b = far island
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -52,6 +55,18 @@ vec3 sky(vec3 d) {
   float g = exp(-e * 24.0) * exp(-d.x * d.x * 7.0);       // low light behind the crest
   return c + uGlow * g * 0.6;
 }
+#ifdef SKY
+float vn(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * vn(p); p = p * 2.03 + vec2(17.1, 9.2); a *= 0.5; }
+  return v;
+}
+#endif
 #ifdef SEA
 ${WAVE_GLSL}
 #endif
@@ -74,6 +89,16 @@ void main() {
     float core = smoothstep(0.5, 0.0, length(fract(sp) - 0.5));
     col += vec3(0.92, 0.9, 0.85) * core * tw * fade * uStars * (h - 0.9965) * 220.0;
   }
+  // a thin cloud layer seen in perspective, thickest a little above the horizon
+  float e = d.y;
+  vec2 cp = vec2(d.x, 1.0) / max(e, 0.02);
+  float cl = fbm(vec2(cp.x * 0.42 + uTime * 0.012, cp.y * 1.3));
+  float cm = smoothstep(0.5, 0.82, cl) * smoothstep(0.025, 0.13, e) * (1.0 - smoothstep(0.32, 0.8, e));
+  col = mix(col, uCloud + uGlow * 0.3 * exp(-e * 9.0) * exp(-d.x * d.x * 4.0), cm * uClouds);
+  // islands on the horizon, the far one already half lost in the haze
+  vec4 sc = texture2D(uWord, vec2(px.x / uWordRes.x, px.y / uWordRes.y));
+  col = mix(col, uIsleFar, sc.b);
+  col = mix(col, uIsle, sc.g);
 #else
   if (dy > 0.0) discard;
   float t = 1.0 / -d.y;                                      // eye height 1
@@ -89,9 +114,12 @@ void main() {
   float up = r.y / r.z * uF;
   float xs = uRes.x * 0.5 + r.x / r.z * uF;
   vec2 wuv = vec2(xs / uWordRes.x, 1.0 - up / uWordRes.y);
-  float word = 0.0;
-  if (wuv.x > 0.0 && wuv.x < 1.0 && wuv.y > 0.0 && wuv.y < 1.0) word = texture2D(uWord, wuv).a;
-  vec3 refl = mix(sky(r) * 0.85, uWordCol * 0.86, word * 0.74);
+  vec4 sc = vec4(0.0);
+  if (wuv.x > 0.0 && wuv.x < 1.0 && wuv.y > 0.0 && wuv.y < 1.0) sc = texture2D(uWord, wuv);
+  vec3 refl = sky(r) * 0.85;
+  refl = mix(refl, uIsleFar * 0.9, sc.b);
+  refl = mix(refl, uIsle * 0.9, sc.g);
+  refl = mix(refl, uWordCol * 0.86, sc.r * 0.74);
 
   float depth01 = clamp(-dy / (uRes.y - uHz), 0.0, 1.0);
   vec3 body = mix(uBody, uDeep, depth01) * (0.85 + 0.15 * n.z);
@@ -118,14 +146,41 @@ const LOOK = {
   dark: {
     skyTop: "#070b17", skyMid: "#101a31", haze: "#1f2c48", glow: "#4a3f3a",
     body: "#132038", deep: "#080e1b", glint: "#f4e6cc", word: "#ecdcc2", stars: 1,
+    isle: "#05080f", isleFar: "#141d33", cloud: "#18223b", clouds: 0.55,
   },
   light: {
-    skyTop: "#e9e1d2", skyMid: "#d6dde3", haze: "#c3cfdb", glow: "#e8d2b0",
-    body: "#56779f", deep: "#3d5c85", glint: "#ffffff", word: "#19203a", stars: 0,
+    skyTop: "#5f8fbf", skyMid: "#9fbfdc", haze: "#eadfcb", glow: "#fff0d2",
+    body: "#3a6a95", deep: "#244d78", glint: "#ffffff", word: "#19203a", stars: 0,
+    isle: "#4e6680", isleFar: "#9aaec2", cloud: "#fbf7ef", clouds: 0.8,
   },
 };
 const LOOK_U = [["uSkyTop", "skyTop"], ["uSkyMid", "skyMid"], ["uHaze", "haze"], ["uGlow", "glow"],
-  ["uBody", "body"], ["uDeep", "deep"], ["uGlint", "glint"], ["uWordCol", "word"]];
+  ["uBody", "body"], ["uDeep", "deep"], ["uGlint", "glint"], ["uWordCol", "word"],
+  ["uIsle", "isle"], ["uIsleFar", "isleFar"], ["uCloud", "cloud"]];
+
+// the crest's own palm (phosphor tree-palm, MIT), planted on the islands
+const PALM = new Path2D("M239.84 60.33a8 8 0 0 1-4.65 5.75L179 90.55a71.42 71.42 0 0 1 43.36 33.21a70.64 70.64 0 0 1 7.2 54.32a8 8 0 0 1-12.56 4.28l-81-61.68V224a8 8 0 0 1-16 0V120.68l-81 61.68a8 8 0 0 1-12.57-4.28a70.64 70.64 0 0 1 7.2-54.32A71.42 71.42 0 0 1 77 90.55L20.81 66.08a8 8 0 0 1-2.6-12.85a66.86 66.86 0 0 1 97.74 0a72.2 72.2 0 0 1 12 17a72.2 72.2 0 0 1 12.05-17a66.86 66.86 0 0 1 97.74 0a8 8 0 0 1 2.1 7.1");
+
+// a low island: a soft mound with palms, its base sitting on the horizon line
+function island(ctx, cx, base, w, h, palms) {
+  ctx.beginPath();
+  ctx.moveTo(cx - w / 2, base);
+  ctx.bezierCurveTo(cx - w * 0.3, base - h * 0.05, cx - w * 0.22, base - h * 0.3, cx - w * 0.05, base - h * 0.32);
+  ctx.bezierCurveTo(cx + w * 0.14, base - h * 0.34, cx + w * 0.24, base - h * 0.16, cx + w * 0.34, base - h * 0.1);
+  ctx.bezierCurveTo(cx + w * 0.42, base - h * 0.06, cx + w * 0.46, base - h * 0.02, cx + w / 2, base);
+  ctx.closePath();
+  ctx.fill();
+  for (const p of palms) {
+    const ph = h * p.s, sc = ph / 232;                       // the icon's trunk runs y 8..232
+    ctx.save();
+    ctx.translate(cx + w * p.x, base - h * p.y);
+    ctx.rotate(p.r);
+    ctx.scale(sc * (p.flip ? -1 : 1), sc);
+    ctx.translate(-128, -232);
+    ctx.fill(PALM);
+    ctx.restore();
+  }
+}
 
 // quality ladder for slow gpus: drop to 30fps first (waves are slow, it reads the same),
 // then render scale, never below 0.75
@@ -201,10 +256,21 @@ export function startSea(canvas, opts) {
     wctx.font = `${cs.fontWeight} ${fs}px ${cs.fontFamily}`;
     if ("letterSpacing" in wctx) wctx.letterSpacing = cs.letterSpacing;
     wctx.textBaseline = "alphabetic";
-    wctx.fillStyle = "#fff";
+    // each layer in its own channel; additive so overlaps don't steal coverage from each other
+    wctx.globalCompositeOperation = "lighter";
+    wctx.fillStyle = "#f00";
     wctx.fillText(wordEl.textContent, wr.left - cr.left + parseFloat(cs.textIndent || 0), baseline);
+    const cw = cr.width, ih = Math.min(cr.height * 0.11, cw * 0.09);
+    wctx.fillStyle = "#00f";
+    island(wctx, cw * 0.1, baseline + 0.5, ih * 2.2, ih * 0.55, [{ x: 0.02, y: 0.28, s: 0.62, r: -0.08 }]);
+    wctx.fillStyle = "#0f0";
+    island(wctx, cw * 0.87, baseline + 0.5, ih * 3.2, ih, [
+      { x: -0.08, y: 0.28, s: 0.95, r: -0.1 },
+      { x: 0.1, y: 0.3, s: 0.7, r: 0.12, flip: true },
+    ]);
     wctx.restore();
     gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, wc);
     each((u) => { gl.uniform1f(u("uHz"), hz); gl.uniform2f(u("uWordRes"), wc.width, wc.height); });
   }
@@ -214,6 +280,7 @@ export function startSea(canvas, opts) {
     each((u) => {
       for (const [n, k] of LOOK_U) gl.uniform3fv(u(n), hex(l[k]));
       gl.uniform1f(u("uStars"), l.stars);
+      gl.uniform1f(u("uClouds"), l.clouds);
     });
   }
 
