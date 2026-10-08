@@ -377,7 +377,18 @@ export function startSea(canvas, opts) {
       gl.uniform1f(u("uPlateOn"), on ? 1 : 0);
       gl.uniform2f(u("uPlateT"), PLATES[shape].tx, PLATES[shape].tv);
     });
+    if (on) reveal();
   }
+  // the scene stays hidden until its rendered sky is in, so the stand-in sky never flashes
+  let shown = false;
+  function reveal() {
+    if (shown) return;
+    shown = true;
+    canvas.style.transition = reduced ? "none" : "opacity .6s ease";
+    canvas.style.opacity = "1";
+  }
+  canvas.style.opacity = "0";
+  setTimeout(reveal, 5000);        // the render never came: fall back to the drawn sky
 
   // every theme-driven uniform, blended by how far into night we are (0 day .. 1 night)
   const lerp = (a, b, t) => a + (b - a) * t;
